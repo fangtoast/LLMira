@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Huiyan-AI Pro
 
-## Getting Started
+专业级 AI 镜像站，基于 Next.js 14 + TypeScript。
 
-First, run the development server:
+## 功能特性
+
+- 左侧历史会话 + 右侧主对话区（可折叠侧边栏）
+- 深色/浅色主题切换
+- API Key 配置弹窗（未配置时自动提示）
+- OpenAI 协议流式对话（`https://api.huiyan-ai.cn`）
+- Markdown + LaTeX (KaTeX) + 代码高亮 + 一键复制
+- Dexie.js 本地会话持久化与搜索
+- 模型动态拉取（`GET /v1/models`）与切换
+- Token 使用量与估算成本展示
+- Artifacts 右侧预览面板
+- pino 请求日志与异常日志
+
+## API 文档参考
+
+- [慧言 API 教程](https://doc.zhypub.cn/docs/api/)
+- [OpenAI 协议示例](https://s.apifox.cn/684f53a9-f231-43b0-a0dc-e3224d5ab341/api-179544799)
+
+## 本地开发
+
+1) 安装依赖
+
+```bash
+npm install
+```
+
+2) 配置环境变量
+
+```bash
+cp .env.example .env.local
+```
+
+`.env.local`:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://api.huiyan-ai.cn
+```
+
+3) 启动开发服务
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+访问 `http://localhost:3000`，会自动重定向到 `/chat`。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 日志链路
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+开发模式下会打印：
 
-## Learn More
+- `[Request Model]`
+- `[Stream Start]`
+- `[Token Count]`
 
-To learn more about Next.js, take a look at the following resources:
+## Docker 部署
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+docker build -t huiyan-ai-pro .
+docker run --rm -p 3000:3000 --env NEXT_PUBLIC_API_BASE_URL=https://api.huiyan-ai.cn huiyan-ai-pro
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Git 提交规范
 
-## Deploy on Vercel
+使用 Conventional Commits：
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `feat: ...`
+- `fix: ...`
+- `refactor: ...`
+- `docs: ...`

@@ -1,26 +1,53 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: 220 23% 97%;
+  --foreground: 224 19% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 224 19% 16%;
+  --primary: 221 83% 55%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 220 17% 94%;
+  --secondary-foreground: 224 19% 20%;
+  --muted: 220 20% 92%;
+  --muted-foreground: 220 12% 43%;
+  --accent: 220 20% 90%;
+  --accent-foreground: 224 19% 16%;
+  --border: 220 16% 86%;
+  --input: 220 16% 86%;
+  --ring: 221 83% 55%;
+  --radius: 1rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+.dark {
+  --background: 0 0% 6.7%;
+  --foreground: 210 40% 98%;
+  --card: 0 0% 10%;
+  --card-foreground: 210 40% 98%;
+  --primary: 216 85% 62%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 0 0% 14%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 0 0% 12%;
+  --muted-foreground: 215 16% 70%;
+  --accent: 0 0% 16%;
+  --accent-foreground: 210 40% 98%;
+  --border: 0 0% 20%;
+  --input: 0 0% 20%;
+  --ring: 217 92% 62%;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  @apply border-border;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply bg-background text-foreground antialiased;
+  background-image: radial-gradient(circle at 12% 8%, rgba(59, 130, 246, 0.08), transparent 26%);
+}
+
+.dark body {
+  background-image: radial-gradient(circle at 20% 10%, rgba(255, 255, 255, 0.04), transparent 30%);
 }
