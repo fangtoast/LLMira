@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, BrainCircuit, ChevronsUpDown, Moon, Sparkles, Sun } from "lucide-react";
+import { Moon, Sparkles, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { useSettingsStore } from "@/lib/store/settingsStore";
@@ -13,11 +13,8 @@ export function TopBar() {
     activeModel,
     activeImageModel,
     generationMode,
-    enableThinking,
     setActiveModel,
     setActiveImageModel,
-    setGenerationMode,
-    setEnableThinking,
   } = useSettingsStore();
   const models = useModels();
   const imageModels = models.filter((item) => /(image|mj|dall|flux|sd)/i.test(item));
@@ -36,53 +33,19 @@ export function TopBar() {
         <span className="text-sm font-semibold text-foreground">Huiyan-AI Pro</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <details className="relative">
-          <summary className="flex h-8 min-w-[180px] cursor-pointer list-none items-center gap-1 rounded-xl bg-card px-2 text-xs text-foreground outline-none ring-1 ring-border sm:min-w-[240px]">
-            <Bot className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="truncate">
-              {generationMode === "image" ? activeImageModel : activeModel}
-              {generationMode === "chat" && enableThinking ? " (Thinking)" : ""}
-            </span>
-            <ChevronsUpDown className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
-          </summary>
-          <div className="absolute right-0 z-30 mt-2 w-72 rounded-xl bg-card p-2 shadow-xl ring-1 ring-border">
-            <div className="mb-2 flex items-center gap-2 px-2 text-xs text-muted-foreground">
-              <BrainCircuit className="h-3.5 w-3.5" />
-              模型与推理选项
-            </div>
-            <select
-              className="mb-2 h-8 w-full rounded-lg bg-secondary/70 px-2 text-xs text-foreground outline-none ring-1 ring-border"
-              value={generationMode}
-              onChange={(e) => setGenerationMode(e.target.value as "chat" | "image")}
-            >
-              <option value="chat">对话模式</option>
-              <option value="image">文生图模式</option>
-            </select>
-            <select
-              className="mb-2 h-8 w-full rounded-lg bg-secondary/70 px-2 text-xs text-foreground outline-none ring-1 ring-border"
-              value={generationMode === "image" ? activeImageModel : activeModel}
-              onChange={(e) =>
-                generationMode === "image" ? setActiveImageModel(e.target.value) : setActiveModel(e.target.value)
-              }
-            >
-              {(generationMode === "image" ? (imageModels.length ? imageModels : models) : models).map((model) => (
-                <option key={model} value={model}>
-                  {model}
-                </option>
-              ))}
-            </select>
-            {generationMode === "chat" ? (
-              <label className="flex h-8 items-center gap-2 rounded-lg bg-secondary/70 px-2 text-xs text-muted-foreground ring-1 ring-border">
-                <input
-                  type="checkbox"
-                  checked={enableThinking}
-                  onChange={(e) => setEnableThinking(e.target.checked)}
-                />
-                深度思考（显示可折叠思考过程）
-              </label>
-            ) : null}
-          </div>
-        </details>
+        <select
+          className="h-8 min-w-[180px] rounded-xl bg-card px-2 text-xs text-foreground outline-none ring-1 ring-border sm:min-w-[240px]"
+          value={generationMode === "image" ? activeImageModel : activeModel}
+          onChange={(e) =>
+            generationMode === "image" ? setActiveImageModel(e.target.value) : setActiveModel(e.target.value)
+          }
+        >
+          {(generationMode === "image" ? (imageModels.length ? imageModels : models) : models).map((model) => (
+            <option key={model} value={model}>
+              {model}
+            </option>
+          ))}
+        </select>
         <Button
           variant="ghost"
           size="icon"

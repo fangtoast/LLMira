@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUp, FileUp, ImagePlus, X } from "lucide-react";
+import { ArrowUp, FileUp, Sparkles, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useSettingsStore } from "@/lib/store/settingsStore";
 
 interface AttachmentItem {
   id: string;
@@ -20,6 +21,7 @@ export function InputBar({
   onSend: (payload: { text: string; imageDataUrls?: string[] }) => Promise<void>;
   loading: boolean;
 }) {
+  const { generationMode, setGenerationMode, enableThinking, setEnableThinking } = useSettingsStore();
   const [value, setValue] = useState("");
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [dragActive, setDragActive] = useState(false);
@@ -130,7 +132,7 @@ export function InputBar({
       }}
     >
       <div
-        className={`mx-auto w-full max-w-3xl rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur-md transition-all duration-200 ${
+        className={`mx-auto w-full max-w-3xl rounded-[32px] border border-border/70 bg-card/40 p-3 backdrop-blur-md transition-all duration-200 dark:border-white/10 dark:bg-white/5 ${
           dragActive ? "shadow-[0_0_0_1px_rgba(59,130,246,0.55)]" : "shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
         }`}
       >
@@ -139,18 +141,18 @@ export function InputBar({
             {attachments.map((item) => (
               <div
                 key={item.id}
-                className="relative flex items-center gap-2 rounded-full bg-white/10 px-2 py-1 text-xs text-zinc-200"
+                className="relative flex items-center gap-2 rounded-full bg-secondary/70 px-2 py-1 text-xs text-foreground dark:bg-white/10 dark:text-zinc-200"
               >
                 {item.dataUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={item.dataUrl} alt={item.name} className="h-6 w-6 rounded-full object-cover" />
                 ) : (
-                  <FileUp className="h-3.5 w-3.5 text-zinc-400" />
+                  <FileUp className="h-3.5 w-3.5 text-muted-foreground dark:text-zinc-400" />
                 )}
                 <span className="max-w-[130px] truncate">{item.name}</span>
                 <button
                   type="button"
-                  className="rounded-full bg-black/40 p-0.5 text-white"
+                className="rounded-full bg-black/40 p-0.5 text-white"
                   onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== item.id))}
                 >
                   <X className="h-3 w-3" />
@@ -160,20 +162,7 @@ export function InputBar({
           </div>
         )}
 
-        <div className="flex items-end gap-2">
-        <label className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/10 text-zinc-400 ring-1 ring-white/10 hover:text-zinc-200">
-          <ImagePlus className="h-4 w-4" />
-          <input
-            type="file"
-            accept="image/*,.pdf,.doc,.docx,.txt,.md,.csv,.json"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              void handleUpload(e.target.files);
-              e.currentTarget.value = "";
-            }}
-          />
-        </label>
+        <div className="flex items-center gap-2">
         <Textarea
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -184,16 +173,77 @@ export function InputBar({
             }
           }}
           placeholder="输入你的问题..."
-          className="min-h-[44px] max-h-32 resize-y rounded-2xl border-none bg-transparent leading-relaxed text-zinc-100 ring-0 focus-visible:ring-0"
+          className="min-h-[44px] max-h-32 resize-y rounded-2xl border-none bg-transparent leading-relaxed text-foreground ring-0 focus-visible:ring-0 dark:text-zinc-100"
         />
         <Button
           onClick={() => void submit()}
           disabled={loading}
           size="icon"
-          className="h-9 w-9 rounded-full bg-white/10 text-zinc-300 transition-all duration-200 hover:scale-105 hover:bg-primary hover:text-primary-foreground"
+          className="h-9 w-9 rounded-full bg-secondary/80 text-muted-foreground transition-all duration-200 hover:scale-105 hover:bg-primary hover:text-primary-foreground dark:bg-white/10 dark:text-zinc-300"
         >
           <ArrowUp className="h-4 w-4" />
         </Button>
+      </div>
+      <div className="mt-2 flex items-center justify-between px-1 text-sm text-muted-foreground dark:text-zinc-400">
+        <div className="flex items-center gap-3">
+          <label className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 hover:bg-white/10">
+            <FileUp className="h-3.5 w-3.5" />
+            附件
+            <input
+              type="file"
+              accept="image/*,.pdf,.doc,.docx,.txt,.md,.csv,.json"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void handleUpload(e.target.files);
+                e.currentTarget.value = "";
+              }}
+            />
+          </label>
+          <details className="relative">
+            <summary className="inline-flex list-none cursor-pointer items-center gap-1 rounded-full px-2 py-1 hover:bg-white/10">
+              <Wrench className="h-3.5 w-3.5" />
+              工具
+            </summary>
+            <div className="absolute left-0 top-8 z-20 w-40 rounded-lg bg-card p-1 shadow-xl ring-1 ring-border dark:bg-zinc-900 dark:ring-zinc-700">
+              <button
+                type="button"
+                onClick={() => setGenerationMode("chat")}
+                className={`block w-full rounded-md px-2 py-1 text-left text-xs ${generationMode === "chat" ? "bg-secondary text-foreground dark:bg-zinc-800 dark:text-zinc-100" : "text-muted-foreground hover:bg-accent dark:text-zinc-300 dark:hover:bg-zinc-800/70"}`}
+              >
+                对话模式
+              </button>
+              <button
+                type="button"
+                onClick={() => setGenerationMode("image")}
+                className={`mt-1 block w-full rounded-md px-2 py-1 text-left text-xs ${generationMode === "image" ? "bg-secondary text-foreground dark:bg-zinc-800 dark:text-zinc-100" : "text-muted-foreground hover:bg-accent dark:text-zinc-300 dark:hover:bg-zinc-800/70"}`}
+              >
+                文生图模式
+              </button>
+            </div>
+          </details>
+          <label className="inline-flex items-center gap-1 rounded-full px-2 py-1 hover:bg-white/10">
+            <Sparkles className="h-3.5 w-3.5" />
+            思考
+            <input
+              type="checkbox"
+              checked={enableThinking}
+              onChange={(e) => setEnableThinking(e.target.checked)}
+              className="ml-1"
+            />
+          </label>
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-zinc-400">
+            当前: {generationMode === "image" ? "文生图" : "对话"}
+          </span>
+          {enableThinking && generationMode === "chat" ? (
+            <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 hover:bg-white/10">
+              <Sparkles className="h-3.5 w-3.5" />
+              深度思考已开启
+            </span>
+          ) : null}
+        </div>
       </div>
       </div>
     </div>

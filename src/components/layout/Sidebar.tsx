@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Settings2, Trash2 } from "lucide-react";
 import { useConversations } from "@/hooks/useConversations";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,21 @@ import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const [keyword, setKeyword] = useState("");
-  const { sidebarCollapsed, setSidebarCollapsed, activeModel } = useSettingsStore();
+  const {
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    activeModel,
+    temperature,
+    topP,
+    maxTokens,
+    presencePenalty,
+    frequencyPenalty,
+    setTemperature,
+    setTopP,
+    setMaxTokens,
+    setPresencePenalty,
+    setFrequencyPenalty,
+  } = useSettingsStore();
   const {
     conversations,
     loadAll,
@@ -29,7 +43,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "bg-zinc-950 text-zinc-100 shadow-[inset_-1px_0_0_rgba(255,255,255,0.04),16px_0_30px_-22px_rgba(0,0,0,0.75)] transition-all",
+        "bg-card text-card-foreground shadow-[inset_-1px_0_0_rgba(255,255,255,0.04),16px_0_30px_-22px_rgba(0,0,0,0.35)] transition-all dark:bg-zinc-950 dark:text-zinc-100",
         sidebarCollapsed ? "w-16" : "w-72",
       )}
     >
@@ -38,7 +52,7 @@ export function Sidebar() {
           {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
         {!sidebarCollapsed && (
-          <Button size="sm" className="rounded-xl bg-zinc-900 text-zinc-100 hover:bg-zinc-800" onClick={() => void createConversation(activeModel)}>
+          <Button size="sm" className="rounded-xl bg-secondary text-secondary-foreground hover:bg-accent dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800" onClick={() => void createConversation(activeModel)}>
             <Plus className="mr-1 h-4 w-4" />
             新建
           </Button>
@@ -54,7 +68,7 @@ export function Sidebar() {
               void searchConversations(v);
             }}
             placeholder="搜索对话"
-            className="rounded-xl border-none bg-zinc-900 text-zinc-200 ring-1 ring-zinc-800"
+            className="rounded-xl border-none bg-secondary text-foreground ring-1 ring-border dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-800"
           />
         </div>
       )}
@@ -65,8 +79,8 @@ export function Sidebar() {
             className={cn(
               "group mb-1 flex items-center gap-1 rounded-full px-3 py-1.5 transition-colors",
               activeConversationId === item.id
-                ? "bg-zinc-800/95 text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
-                : "hover:bg-white/10 text-zinc-400",
+                ? "bg-secondary text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border))] dark:bg-zinc-800/95 dark:text-zinc-100 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+                : "hover:bg-accent/70 text-muted-foreground dark:hover:bg-white/10 dark:text-zinc-400",
             )}
           >
             {activeConversationId === item.id ? <div className="h-5 w-[2px] rounded-full bg-sky-400" /> : <div className="w-[2px]" />}
@@ -77,7 +91,7 @@ export function Sidebar() {
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-7 w-7 shrink-0 rounded-full text-zinc-500 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-zinc-700/70 hover:text-zinc-100"
+                className="h-7 w-7 shrink-0 rounded-full text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent hover:text-foreground dark:text-zinc-500 dark:hover:bg-zinc-700/70 dark:hover:text-zinc-100"
                 onClick={() => void deleteConversation(item.id)}
                 aria-label="删除对话"
               >
@@ -87,6 +101,76 @@ export function Sidebar() {
           </div>
         ))}
       </ScrollArea>
+      {!sidebarCollapsed && (
+        <details className="mx-2 mb-2 mt-auto rounded-xl bg-secondary/70 p-2 ring-1 ring-border dark:bg-zinc-900/80 dark:ring-zinc-800">
+          <summary className="flex cursor-pointer list-none items-center gap-2 text-sm text-muted-foreground">
+            <Settings2 className="h-4 w-4" />
+            展开设置
+          </summary>
+          <div className="mt-3 space-y-2 text-xs">
+            <label className="flex items-center justify-between gap-2">
+              <span>Temperature</span>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="2"
+                value={temperature}
+                onChange={(e) => setTemperature(Number(e.target.value))}
+                className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2">
+              <span>Top P</span>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="1"
+                value={topP}
+                onChange={(e) => setTopP(Number(e.target.value))}
+                className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2">
+              <span>Max Tokens</span>
+              <input
+                type="number"
+                step="1"
+                min="1"
+                max="32768"
+                value={maxTokens}
+                onChange={(e) => setMaxTokens(Number(e.target.value))}
+                className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2">
+              <span>Presence</span>
+              <input
+                type="number"
+                step="0.1"
+                min="-2"
+                max="2"
+                value={presencePenalty}
+                onChange={(e) => setPresencePenalty(Number(e.target.value))}
+                className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2">
+              <span>Frequency</span>
+              <input
+                type="number"
+                step="0.1"
+                min="-2"
+                max="2"
+                value={frequencyPenalty}
+                onChange={(e) => setFrequencyPenalty(Number(e.target.value))}
+                className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+              />
+            </label>
+          </div>
+        </details>
+      )}
     </aside>
   );
 }

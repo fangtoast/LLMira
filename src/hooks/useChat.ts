@@ -11,7 +11,19 @@ function uid() {
 }
 
 export function useChat() {
-  const { apiKey, activeModel, activeImageModel, generationMode, enableThinking, setApiKeyModalOpen } =
+  const {
+    apiKey,
+    activeModel,
+    activeImageModel,
+    generationMode,
+    enableThinking,
+    temperature,
+    topP,
+    maxTokens,
+    presencePenalty,
+    frequencyPenalty,
+    setApiKeyModalOpen,
+  } =
     useSettingsStore();
   const {
     activeConversationId,
@@ -23,6 +35,17 @@ export function useChat() {
     setLastTokenUsage,
   } = useChatStore();
   const { createConversation, saveMessages } = useConversations();
+
+  const buildFriendlyError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : "未知错误";
+    if (message.includes("503")) {
+      return "服务暂时繁忙（503），请稍后重试，或切换其他模型后再发送。";
+    }
+    if (message.includes("401") || message.includes("403")) {
+      return "鉴权失败，请检查 API Key 是否有效。";
+    }
+    return `请求失败：${message}`;
+  };
 
   const sendMessage = useCallback(
     async (payload: { text: string; imageDataUrls?: string[] }) => {
@@ -67,6 +90,11 @@ export function useChat() {
             {
               model: activeModel,
               reasoning_effort: enableThinking ? "high" : undefined,
+              temperature,
+              top_p: topP,
+              max_tokens: maxTokens,
+              presence_penalty: presencePenalty,
+              frequency_penalty: frequencyPenalty,
               messages: [
                 ...(messagesByConversation[conversationId] ?? []).map((item) => ({
                   role: item.role,
@@ -113,6 +141,14 @@ export function useChat() {
             },
           );
         }
+      } catch (error) {
+        const fallback = buildFriendlyError(error);
+        patchAssistantMessage(conversationId, assistantId, { content: fallback });
+        await saveMessages(conversationId, [
+          ...(messagesByConversation[conversationId] ?? []),
+          userMessage,
+          { ...assistantMessage, content: fallback },
+        ]);
       } finally {
         setLoading(false);
       }
@@ -125,13 +161,18 @@ export function useChat() {
       apiKey,
       createConversation,
       enableThinking,
+      frequencyPenalty,
       generationMode,
+      maxTokens,
       messagesByConversation,
       patchAssistantMessage,
+      presencePenalty,
       saveMessages,
       setApiKeyModalOpen,
       setLastTokenUsage,
       setLoading,
+      temperature,
+      topP,
     ],
   );
 

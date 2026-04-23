@@ -21,17 +21,18 @@ export function WelcomePanel({ conversationId }: { conversationId?: string | nul
   }, [conversationId]);
 
   return (
-    <div className="mx-auto mt-12 w-full max-w-3xl px-2">
-      <div className="flex items-start gap-3 px-1">
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
-          <Bot className="h-4 w-4" />
+    <div className="mx-auto mt-14 w-full max-w-3xl px-2">
+      <div className="flex flex-col items-center text-center">
+        <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
+          <Bot className="h-4.5 w-4.5" />
         </div>
-        <div>
-          <h2 className="text-lg font-semibold tracking-[0.02em] text-zinc-100">{greeting}</h2>
-          <p className="mt-1 text-sm leading-relaxed tracking-[0.01em] text-zinc-400">
-            {quote.length > 36 ? `${quote.slice(0, 36)}...` : quote}
-          </p>
-        </div>
+        <h2 className="text-3xl font-semibold tracking-[0.01em] text-foreground sm:text-5xl dark:text-zinc-100">{greeting}</h2>
+        <p className="mt-2 text-base font-medium leading-relaxed text-foreground sm:text-[2.5rem] sm:leading-tight dark:text-zinc-200">
+          需要我为你做些什么？
+        </p>
+        <p className="mt-4 max-w-2xl text-sm leading-relaxed tracking-[0.01em] text-muted-foreground dark:text-zinc-400">
+          {quote}
+        </p>
       </div>
     </div>
   );

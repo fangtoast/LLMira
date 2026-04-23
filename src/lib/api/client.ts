@@ -5,6 +5,15 @@ import { MissingApiKeyError } from "./types";
 
 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
 
+async function readErrorText(response: Response) {
+  try {
+    const text = await response.text();
+    return text.slice(0, 200);
+  } catch {
+    return "";
+  }
+}
+
 function extractReasoningToken(delta: unknown): string | undefined {
   if (!delta || typeof delta !== "object") return undefined;
   const d = delta as Record<string, unknown>;
@@ -44,7 +53,10 @@ export async function fetchModels(apiKey: string): Promise<ModelsResponse> {
   const res = await fetch(`${baseUrl}/v1/models`, {
     headers: getHeaders(apiKey),
   });
-  if (!res.ok) throw new Error(`Failed to fetch models: ${res.status}`);
+  if (!res.ok) {
+    const detail = await readErrorText(res);
+    throw new Error(`Failed to fetch models: ${res.status}${detail ? ` - ${detail}` : ""}`);
+  }
   return (await res.json()) as ModelsResponse;
 }
 
@@ -61,7 +73,8 @@ export async function streamChatCompletion(
     body: JSON.stringify({ ...payload, stream: true }),
   });
   if (!response.ok || !response.body) {
-    throw new Error(`Chat API failed: ${response.status}`);
+    const detail = await readErrorText(response);
+    throw new Error(`Chat API failed: ${response.status}${detail ? ` - ${detail}` : ""}`);
   }
 
   callbacks.onStart?.();
@@ -123,7 +136,8 @@ export async function generateImage(apiKey: string, payload: ImageGenerationRequ
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    throw new Error(`Image API failed: ${response.status}`);
+    const detail = await readErrorText(response);
+    throw new Error(`Image API failed: ${response.status}${detail ? ` - ${detail}` : ""}`);
   }
   const json = (await response.json()) as { data?: Array<{ url?: string; b64_json?: string }> };
   const images = (json.data ?? [])

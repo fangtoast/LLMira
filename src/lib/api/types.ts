@@ -9,6 +9,10 @@ export interface ChatCompletionRequest {
   messages: { role: ChatRole; content: string | ChatContentPart[] }[];
   stream?: boolean;
   temperature?: number;
+  top_p?: number;
+  max_tokens?: number;
+  presence_penalty?: number;
+  frequency_penalty?: number;
   reasoning_effort?: "low" | "medium" | "high";
 }
 
