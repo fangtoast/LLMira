@@ -22,13 +22,15 @@ export function WelcomePanel({ conversationId }: { conversationId?: string | nul
 
   return (
     <div className="mx-auto mt-12 w-full max-w-3xl px-2">
-      <div className="flex items-start gap-3 rounded-2xl bg-zinc-900/72 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_28px_rgba(0,0,0,0.3)]">
+      <div className="flex items-start gap-3 px-1">
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
           <Bot className="h-4 w-4" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold tracking-tight text-zinc-100">{greeting}</h2>
-          <p className="mt-1 text-sm leading-relaxed text-zinc-400">{quote.length > 30 ? `${quote.slice(0, 30)}...` : quote}</p>
+          <h2 className="text-lg font-semibold tracking-[0.02em] text-zinc-100">{greeting}</h2>
+          <p className="mt-1 text-sm leading-relaxed tracking-[0.01em] text-zinc-400">
+            {quote.length > 36 ? `${quote.slice(0, 36)}...` : quote}
+          </p>
         </div>
       </div>
     </div>
