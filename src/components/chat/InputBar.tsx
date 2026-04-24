@@ -132,7 +132,7 @@ export function InputBar({
       }}
     >
       <div
-        className={`mx-auto w-full max-w-3xl rounded-[32px] border border-border/70 bg-card/40 p-3 backdrop-blur-md transition-all duration-200 dark:border-white/10 dark:bg-white/5 ${
+        className={`mx-auto w-full max-w-3xl rounded-[32px] border border-slate-200/80 bg-white/85 p-3 backdrop-blur-md transition-all duration-200 shadow-[0_12px_28px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-white/5 dark:shadow-[0_12px_28px_rgba(0,0,0,0.28)] ${
           dragActive ? "shadow-[0_0_0_1px_rgba(59,130,246,0.55)]" : "shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
         }`}
       >
@@ -141,13 +141,13 @@ export function InputBar({
             {attachments.map((item) => (
               <div
                 key={item.id}
-                className="relative flex items-center gap-2 rounded-full bg-secondary/70 px-2 py-1 text-xs text-foreground dark:bg-white/10 dark:text-zinc-200"
+                className="relative flex items-center gap-2 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-white/10 dark:text-zinc-200"
               >
                 {item.dataUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={item.dataUrl} alt={item.name} className="h-6 w-6 rounded-full object-cover" />
                 ) : (
-                  <FileUp className="h-3.5 w-3.5 text-muted-foreground dark:text-zinc-400" />
+                  <FileUp className="h-3.5 w-3.5 text-slate-500 dark:text-zinc-400" />
                 )}
                 <span className="max-w-[130px] truncate">{item.name}</span>
                 <button
@@ -173,18 +173,18 @@ export function InputBar({
             }
           }}
           placeholder="输入你的问题..."
-          className="min-h-[44px] max-h-32 resize-y rounded-2xl border-none bg-transparent leading-relaxed text-foreground ring-0 focus-visible:ring-0 dark:text-zinc-100"
+          className="min-h-[44px] max-h-32 resize-y rounded-2xl border-none bg-transparent leading-relaxed text-slate-900 ring-0 focus-visible:ring-0 dark:text-zinc-100"
         />
         <Button
           onClick={() => void submit()}
           disabled={loading}
           size="icon"
-          className="h-9 w-9 rounded-full bg-secondary/80 text-muted-foreground transition-all duration-200 hover:scale-105 hover:bg-primary hover:text-primary-foreground dark:bg-white/10 dark:text-zinc-300"
+          className="h-9 w-9 rounded-full bg-slate-200 text-slate-600 transition-all duration-200 hover:scale-105 hover:bg-primary hover:text-primary-foreground dark:bg-white/10 dark:text-zinc-300"
         >
           <ArrowUp className="h-4 w-4" />
         </Button>
       </div>
-      <div className="mt-2 flex items-center justify-between px-1 text-sm text-muted-foreground dark:text-zinc-400">
+      <div className="mt-2 flex items-center justify-between px-1 text-sm text-slate-600 dark:text-zinc-400">
         <div className="flex items-center gap-3">
           <label className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-1 hover:bg-white/10">
             <FileUp className="h-3.5 w-3.5" />
@@ -205,18 +205,18 @@ export function InputBar({
               <Wrench className="h-3.5 w-3.5" />
               工具
             </summary>
-            <div className="absolute left-0 top-8 z-20 w-40 rounded-lg bg-card p-1 shadow-xl ring-1 ring-border dark:bg-zinc-900 dark:ring-zinc-700">
+            <div className="absolute left-0 bottom-full top-auto z-30 mb-1.5 w-40 origin-bottom rounded-lg bg-white p-1 shadow-xl ring-1 ring-slate-200 dark:bg-zinc-900 dark:ring-zinc-700">
               <button
                 type="button"
                 onClick={() => setGenerationMode("chat")}
-                className={`block w-full rounded-md px-2 py-1 text-left text-xs ${generationMode === "chat" ? "bg-secondary text-foreground dark:bg-zinc-800 dark:text-zinc-100" : "text-muted-foreground hover:bg-accent dark:text-zinc-300 dark:hover:bg-zinc-800/70"}`}
+                className={`block w-full rounded-md px-2 py-1 text-left text-xs ${generationMode === "chat" ? "bg-slate-100 text-slate-800 dark:bg-zinc-800 dark:text-zinc-100" : "text-slate-600 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-zinc-800/70"}`}
               >
                 对话模式
               </button>
               <button
                 type="button"
                 onClick={() => setGenerationMode("image")}
-                className={`mt-1 block w-full rounded-md px-2 py-1 text-left text-xs ${generationMode === "image" ? "bg-secondary text-foreground dark:bg-zinc-800 dark:text-zinc-100" : "text-muted-foreground hover:bg-accent dark:text-zinc-300 dark:hover:bg-zinc-800/70"}`}
+                className={`mt-1 block w-full rounded-md px-2 py-1 text-left text-xs ${generationMode === "image" ? "bg-slate-100 text-slate-800 dark:bg-zinc-800 dark:text-zinc-100" : "text-slate-600 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-zinc-800/70"}`}
               >
                 文生图模式
               </button>

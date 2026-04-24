@@ -11,10 +11,13 @@ import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const [keyword, setKeyword] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const {
     sidebarCollapsed,
     setSidebarCollapsed,
     activeModel,
+    userName,
+    userAvatarText,
     temperature,
     topP,
     maxTokens,
@@ -25,6 +28,8 @@ export function Sidebar() {
     setMaxTokens,
     setPresencePenalty,
     setFrequencyPenalty,
+    setUserName,
+    setUserAvatarText,
   } = useSettingsStore();
   const {
     conversations,
@@ -72,7 +77,8 @@ export function Sidebar() {
           />
         </div>
       )}
-      <ScrollArea className="h-[calc(100vh-5rem)] px-2 pb-3">
+      <div className="flex h-[calc(100vh-5rem)] flex-col">
+      <ScrollArea className="flex-1 px-2 pb-3">
         {conversations.map((item) => (
           <div
             key={item.id}
@@ -101,76 +107,108 @@ export function Sidebar() {
           </div>
         ))}
       </ScrollArea>
-      {!sidebarCollapsed && (
-        <details className="mx-2 mb-2 mt-auto rounded-xl bg-secondary/70 p-2 ring-1 ring-border dark:bg-zinc-900/80 dark:ring-zinc-800">
-          <summary className="flex cursor-pointer list-none items-center gap-2 text-sm text-muted-foreground">
-            <Settings2 className="h-4 w-4" />
-            展开设置
-          </summary>
-          <div className="mt-3 space-y-2 text-xs">
-            <label className="flex items-center justify-between gap-2">
-              <span>Temperature</span>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                max="2"
-                value={temperature}
-                onChange={(e) => setTemperature(Number(e.target.value))}
-                className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
-              />
-            </label>
-            <label className="flex items-center justify-between gap-2">
-              <span>Top P</span>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                max="1"
-                value={topP}
-                onChange={(e) => setTopP(Number(e.target.value))}
-                className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
-              />
-            </label>
-            <label className="flex items-center justify-between gap-2">
-              <span>Max Tokens</span>
-              <input
-                type="number"
-                step="1"
-                min="1"
-                max="32768"
-                value={maxTokens}
-                onChange={(e) => setMaxTokens(Number(e.target.value))}
-                className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
-              />
-            </label>
-            <label className="flex items-center justify-between gap-2">
-              <span>Presence</span>
-              <input
-                type="number"
-                step="0.1"
-                min="-2"
-                max="2"
-                value={presencePenalty}
-                onChange={(e) => setPresencePenalty(Number(e.target.value))}
-                className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
-              />
-            </label>
-            <label className="flex items-center justify-between gap-2">
-              <span>Frequency</span>
-              <input
-                type="number"
-                step="0.1"
-                min="-2"
-                max="2"
-                value={frequencyPenalty}
-                onChange={(e) => setFrequencyPenalty(Number(e.target.value))}
-                className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
-              />
-            </label>
+      <div className="border-t border-border/60 px-2 py-2 dark:border-zinc-800">
+        <button
+          type="button"
+          className={cn(
+            "group flex w-full items-center gap-2 rounded-full px-3 py-2 text-left text-sm transition-colors",
+            settingsOpen
+              ? "bg-secondary text-foreground dark:bg-zinc-800/95 dark:text-zinc-100"
+              : "hover:bg-accent/70 text-muted-foreground dark:hover:bg-white/10 dark:text-zinc-400",
+          )}
+          onClick={() => setSettingsOpen((prev) => !prev)}
+        >
+          <Settings2 className="h-4 w-4 shrink-0" />
+          {!sidebarCollapsed && <span>设置</span>}
+        </button>
+
+        {settingsOpen && !sidebarCollapsed && (
+          <div className="mt-2 rounded-xl bg-secondary/70 p-2 ring-1 ring-border dark:bg-zinc-900/80 dark:ring-zinc-800">
+            <div className="space-y-2 text-xs">
+              <label className="flex items-center justify-between gap-2">
+                <span>昵称</span>
+                <input
+                  type="text"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  className="w-24 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-2">
+                <span>头像文字</span>
+                <input
+                  type="text"
+                  value={userAvatarText}
+                  maxLength={2}
+                  onChange={(e) => setUserAvatarText(e.target.value)}
+                  className="w-16 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-2">
+                <span>Temperature</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="2"
+                  value={temperature}
+                  onChange={(e) => setTemperature(Number(e.target.value))}
+                  className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-2">
+                <span>Top P</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="1"
+                  value={topP}
+                  onChange={(e) => setTopP(Number(e.target.value))}
+                  className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-2">
+                <span>Max Tokens</span>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="32768"
+                  value={maxTokens}
+                  onChange={(e) => setMaxTokens(Number(e.target.value))}
+                  className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-2">
+                <span>Presence</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="-2"
+                  max="2"
+                  value={presencePenalty}
+                  onChange={(e) => setPresencePenalty(Number(e.target.value))}
+                  className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-2">
+                <span>Frequency</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="-2"
+                  max="2"
+                  value={frequencyPenalty}
+                  onChange={(e) => setFrequencyPenalty(Number(e.target.value))}
+                  className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+                />
+              </label>
+            </div>
           </div>
-        </details>
-      )}
+        )}
+      </div>
+      </div>
     </aside>
   );
 }

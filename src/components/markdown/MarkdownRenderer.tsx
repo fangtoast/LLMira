@@ -5,14 +5,21 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { CodeBlock } from "./CodeBlock";
+import { cn } from "@/lib/utils";
 
 interface Props {
   content: string;
+  className?: string;
 }
 
-export function MarkdownRenderer({ content }: Props) {
+export function MarkdownRenderer({ content, className }: Props) {
   return (
-    <div className="prose prose-zinc dark:prose-invert max-w-none text-sm">
+    <div
+      className={cn(
+        "prose prose-zinc dark:prose-invert max-w-none text-sm",
+        className,
+      )}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
         rehypePlugins={[rehypeKatex]}

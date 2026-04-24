@@ -17,6 +17,8 @@ export function useChat() {
     activeImageModel,
     generationMode,
     enableThinking,
+    userName,
+    userAvatarText,
     temperature,
     topP,
     maxTokens,
@@ -59,9 +61,24 @@ export function useChat() {
       if (!conversationId) {
         conversationId = await createConversation(generationMode === "image" ? activeImageModel : activeModel);
       }
-      const userMessage = { id: uid(), role: "user" as const, content, createdAt: Date.now(), imageUrls: imageDataUrls };
+      const userMessage = {
+        id: uid(),
+        role: "user" as const,
+        senderName: userName,
+        senderAvatar: userAvatarText,
+        content,
+        createdAt: Date.now(),
+        imageUrls: imageDataUrls,
+      };
       const assistantId = uid();
-      const assistantMessage = { id: assistantId, role: "assistant" as const, content: "", createdAt: Date.now() };
+      const assistantMessage = {
+        id: assistantId,
+        role: "assistant" as const,
+        senderName: "Assistant",
+        modelName: generationMode === "image" ? activeImageModel : activeModel,
+        content: "",
+        createdAt: Date.now(),
+      };
       addMessage(conversationId, userMessage);
       addMessage(conversationId, assistantMessage);
       setLoading(true);
@@ -173,6 +190,8 @@ export function useChat() {
       setLoading,
       temperature,
       topP,
+      userAvatarText,
+      userName,
     ],
   );
 

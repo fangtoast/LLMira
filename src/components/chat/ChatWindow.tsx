@@ -13,11 +13,16 @@ export function ChatWindow({
 }) {
   return (
     <div className="h-full overflow-auto px-3 sm:px-6">
-      <div className="mx-auto w-full max-w-3xl py-4 sm:py-6">
-        {messages.length === 0 ? <WelcomePanel conversationId={conversationId} /> : null}
-        {messages.map((item) => (
-          <MessageBubble key={item.id} message={item} />
-        ))}
+      <div className="mx-auto w-full max-w-3xl py-6 sm:py-8">
+        {messages.length === 0 ? (
+          <WelcomePanel conversationId={conversationId} />
+        ) : (
+          <div className="space-y-6">
+            {messages.map((item) => (
+              <MessageBubble key={item.id} message={item} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

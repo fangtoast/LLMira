@@ -5,6 +5,8 @@ import { persist } from "zustand/middleware";
 
 interface SettingsState {
   apiKey: string;
+  userName: string;
+  userAvatarText: string;
   activeModel: string;
   activeImageModel: string;
   generationMode: "chat" | "image";
@@ -17,6 +19,8 @@ interface SettingsState {
   sidebarCollapsed: boolean;
   apiKeyModalOpen: boolean;
   setApiKey: (key: string) => void;
+  setUserName: (name: string) => void;
+  setUserAvatarText: (text: string) => void;
   setActiveModel: (model: string) => void;
   setActiveImageModel: (model: string) => void;
   setGenerationMode: (mode: "chat" | "image") => void;
@@ -34,6 +38,8 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       apiKey: "",
+      userName: "Xiao",
+      userAvatarText: "潇",
       activeModel: "gpt-5-chat",
       activeImageModel: "gpt-image-1",
       generationMode: "chat",
@@ -46,6 +52,8 @@ export const useSettingsStore = create<SettingsState>()(
       sidebarCollapsed: false,
       apiKeyModalOpen: false,
       setApiKey: (apiKey) => set({ apiKey }),
+      setUserName: (userName) => set({ userName: userName || "Xiao" }),
+      setUserAvatarText: (userAvatarText) => set({ userAvatarText: (userAvatarText || "潇").slice(0, 2) }),
       setActiveModel: (activeModel) => set({ activeModel }),
       setActiveImageModel: (activeImageModel) => set({ activeImageModel }),
       setGenerationMode: (generationMode) => set({ generationMode }),
@@ -62,6 +70,8 @@ export const useSettingsStore = create<SettingsState>()(
       name: "huiyan-settings",
       partialize: (state) => ({
         apiKey: state.apiKey,
+        userName: state.userName,
+        userAvatarText: state.userAvatarText,
         activeModel: state.activeModel,
         activeImageModel: state.activeImageModel,
         generationMode: state.generationMode,

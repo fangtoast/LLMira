@@ -33,9 +33,9 @@ export function MainLayout() {
   }, [activeConversationId, loadMessages]);
 
   return (
-    <div className="flex h-screen w-full bg-zinc-900 text-foreground dark:bg-zinc-900">
+    <div className="flex h-screen w-full bg-background text-foreground dark:bg-zinc-900">
       <Sidebar />
-      <section className="relative flex min-w-0 flex-1 flex-col bg-zinc-900/96 shadow-[inset_24px_0_36px_-28px_rgba(0,0,0,0.42)]">
+      <section className="relative flex min-w-0 flex-1 flex-col bg-card/65 shadow-[inset_24px_0_36px_-28px_rgba(0,0,0,0.15)] dark:bg-zinc-900/96 dark:shadow-[inset_24px_0_36px_-28px_rgba(0,0,0,0.42)]">
         <TopBar />
         <div className="min-h-0 flex-1">
           <ChatWindow messages={messages} conversationId={activeConversationId} />

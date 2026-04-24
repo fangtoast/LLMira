@@ -3,22 +3,25 @@
 import { useMemo } from "react";
 import { Bot } from "lucide-react";
 import { pickQuoteByConversationId } from "@/lib/quotes";
+import { useSettingsStore } from "@/lib/store/settingsStore";
 
-function getGreetingByHour(hour: number) {
-  if (hour < 11) return "上午好，潇~";
-  if (hour < 14) return "中午好，潇~";
-  if (hour < 18) return "下午好，潇~";
-  return "晚上好，潇~";
+function getGreetingByHour(hour: number, displayName: string) {
+  if (hour < 11) return `上午好，${displayName}~`;
+  if (hour < 14) return `中午好，${displayName}~`;
+  if (hour < 18) return `下午好，${displayName}~`;
+  return `晚上好，${displayName}~`;
 }
 
 export function WelcomePanel({ conversationId }: { conversationId?: string | null }) {
+  const { userAvatarText, userName } = useSettingsStore();
   const { greeting, quote } = useMemo(() => {
     const hour = new Date().getHours();
+    const displayName = (userAvatarText || userName || "潇").slice(0, 2);
     return {
-      greeting: getGreetingByHour(hour),
+      greeting: getGreetingByHour(hour, displayName),
       quote: pickQuoteByConversationId(conversationId),
     };
-  }, [conversationId]);
+  }, [conversationId, userAvatarText, userName]);
 
   return (
     <div className="mx-auto mt-14 w-full max-w-3xl px-2">
