@@ -30,8 +30,14 @@ export interface StreamCallbacks {
   onStart?: () => void;
   onToken?: (token: string) => void;
   onReasoningToken?: (token: string) => void;
-  onDone?: (usage?: TokenUsage) => void;
+  onDone?: (usage?: TokenUsage) => void | Promise<void>;
+  /** 流被 AbortController 中止（含 fetch/read 抛出的 AbortError） */
+  onAbort?: () => void | Promise<void>;
 }
+
+export type StreamRequestOptions = {
+  signal?: AbortSignal;
+};
 
 export interface ImageGenerationRequest {
   model: string;

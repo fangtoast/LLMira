@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { BRAND_ICON_PATH, BRAND_NAME } from "@/lib/brand";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -14,8 +15,20 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Huiyan-AI Pro",
-  description: "专业级 AI 镜像站",
+  title: BRAND_NAME,
+  description: `${BRAND_NAME} AI 应用`,
+  icons: {
+    icon: BRAND_ICON_PATH,
+    shortcut: BRAND_ICON_PATH,
+    apple: BRAND_ICON_PATH,
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

@@ -9,12 +9,12 @@ export interface MessageRecord extends ChatMessage {
   conversationId: string;
 }
 
-class HuiyanDB extends Dexie {
+class LlmiraDB extends Dexie {
   conversations!: Table<ConversationRecord, string>;
   messages!: Table<MessageRecord, string>;
 
   constructor() {
-    super("huiyan-ai-pro-db");
+    super("llmira-db");
     this.version(1).stores({
       conversations: "id, title, model, updatedAt, createdAt, keyword",
       messages: "id, conversationId, role, createdAt",
@@ -22,4 +22,4 @@ class HuiyanDB extends Dexie {
   }
 }
 
-export const db = new HuiyanDB();
+export const db = new LlmiraDB();

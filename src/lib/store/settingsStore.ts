@@ -1,7 +1,41 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, type StateStorage, persist } from "zustand/middleware";
+
+const memoryStorage: StateStorage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined,
+};
+
+const webStorage: StateStorage = {
+  getItem: (name) => {
+    try {
+      return localStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name, value) => {
+    try {
+      localStorage.setItem(name, value);
+    } catch {
+      /* ignore quota / private mode */
+    }
+  },
+  removeItem: (name) => {
+    try {
+      localStorage.removeItem(name);
+    } catch {
+      /* ignore */
+    }
+  },
+};
+
+const storage = createJSONStorage<unknown>(() =>
+  typeof window === "undefined" ? memoryStorage : webStorage,
+);
 
 interface SettingsState {
   apiKey: string;
@@ -68,6 +102,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "huiyan-settings",
+      storage,
       partialize: (state) => ({
         apiKey: state.apiKey,
         userName: state.userName,

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { db } from "@/lib/db/dexie";
+import type { ExportedChat } from "@/lib/chat/exportImport";
+import { db, type ConversationRecord } from "@/lib/db/dexie";
 import { useChatStore } from "@/lib/store/chatStore";
 import type { Conversation, ChatMessage } from "@/types";
 
@@ -35,7 +36,8 @@ export function useConversations() {
   }, [conversations, setActiveConversationId, setConversations]);
 
   const loadMessages = useCallback(async (conversationId: string) => {
-    const messages = await db.messages.where("conversationId").equals(conversationId).sortBy("createdAt");
+    const messages = await db.messages.where("conversationId").equals(conversationId).toArray();
+    messages.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
     setMessages(conversationId, messages);
   }, [setMessages]);
 
@@ -44,7 +46,13 @@ export function useConversations() {
     await db.transaction("rw", db.messages, db.conversations, async () => {
       await db.messages.where("conversationId").equals(conversationId).delete();
       await db.messages.bulkPut(payload);
-      const title = messages.find((m) => m.role === "user")?.content.slice(0, 20) || "新对话";
+      const firstUser = messages.find((m) => m.role === "user")?.content ?? "";
+      const title =
+        firstUser
+          .replace(/^#+\s*/g, "")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 28) || "新对话";
       await db.conversations.update(conversationId, { title, updatedAt: Date.now(), keyword: title });
     });
   }, []);
@@ -73,12 +81,47 @@ export function useConversations() {
 
   const searchConversations = useCallback(async (keyword: string) => {
     if (!keyword.trim()) return loadAll();
+    const q = keyword.toLowerCase();
     const all = await db.conversations.toArray();
-    const filtered = all
-      .filter((item) => item.title.toLowerCase().includes(keyword.toLowerCase()))
-      .sort((a, b) => b.updatedAt - a.updatedAt);
-    setConversations(filtered);
+    const fromTitle = all.filter(
+      (item) =>
+        item.title.toLowerCase().includes(q) || ((item as { keyword?: string }).keyword?.toLowerCase() ?? "").includes(q),
+    );
+    const fromTitleIds = new Set(fromTitle.map((c) => c.id));
+    const allMsg = await db.messages.toArray();
+    const fromBodyIds = new Set(
+      allMsg.filter((m) => m.content.toLowerCase().includes(q)).map((m) => m.conversationId),
+    );
+    const map = new Map<string, (typeof all)[0]>();
+    for (const c of all) {
+      if (fromTitleIds.has(c.id) || fromBodyIds.has(c.id)) map.set(c.id, c);
+    }
+    setConversations([...map.values()].sort((a, b) => b.updatedAt - a.updatedAt));
   }, [loadAll, setConversations]);
+
+  const importFromExport = useCallback(
+    async (data: ExportedChat) => {
+      const newId = uid();
+      const now = Date.now();
+      const record: Conversation = {
+        id: newId,
+        title: (data.conversation.title || "导入的对话").slice(0, 40),
+        model: data.conversation.model,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const msgs: ChatMessage[] = data.messages.map((m) => ({ ...m, id: uid() }));
+      await db.transaction("rw", db.conversations, db.messages, async () => {
+        await db.conversations.put({ ...record, keyword: record.title } as ConversationRecord);
+        const payload = msgs.map((m) => ({ ...m, conversationId: newId }));
+        await db.messages.bulkPut(payload);
+      });
+      setConversations([record, ...conversations]);
+      setActiveConversationId(newId);
+      setMessages(newId, msgs);
+    },
+    [conversations, setActiveConversationId, setConversations, setMessages],
+  );
 
   return useMemo(
     () => ({
@@ -91,12 +134,14 @@ export function useConversations() {
       renameConversation,
       deleteConversation,
       searchConversations,
+      importFromExport,
       setActiveConversationId,
     }),
     [
       activeConversationId,
       conversations,
       createConversation,
+      importFromExport,
       loadAll,
       loadMessages,
       renameConversation,

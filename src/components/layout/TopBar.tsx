@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Moon, Sparkles, Sun } from "lucide-react";
+import { Menu, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 import { useModels } from "@/hooks/useModels";
+import { BRAND_ICON_PATH, BRAND_NAME } from "@/lib/brand";
+import { cn } from "@/lib/utils";
 
-export function TopBar() {
+type TopBarProps = {
+  onOpenMobileMenu?: () => void;
+};
+
+export function TopBar({ onOpenMobileMenu }: TopBarProps) {
   const { setTheme, resolvedTheme } = useTheme();
   const {
     activeModel,
@@ -17,30 +23,88 @@ export function TopBar() {
     setActiveImageModel,
   } = useSettingsStore();
   const models = useModels();
-  const imageModels = models.filter((item) => /(image|mj|dall|flux|sd)/i.test(item));
+  const imageModels = models.filter((item) => /(image|mj|dall|flux|sd|gpt-image)/i.test(item));
+  const modelOptions = generationMode === "image" ? (imageModels.length > 0 ? imageModels : models) : models;
+  const currentModel = generationMode === "image" ? activeImageModel : activeModel;
+  const selectValue = currentModel
+    ? modelOptions.includes(currentModel)
+      ? currentModel
+      : currentModel
+    : (modelOptions[0] ?? "");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  return (
-    <header className="sticky top-0 z-20 flex h-10 items-center justify-between bg-card/70 px-3 backdrop-blur-md shadow-[0_1px_0_rgba(15,23,42,0.08)] dark:shadow-[0_1px_0_rgba(255,255,255,0.05)]">
-      <div className="flex items-center gap-2">
-        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/15 text-primary">
-          <Sparkles className="h-3.5 w-3.5" />
+  const selectClass = cn(
+    "h-8 w-full min-w-0 max-w-[9.5rem] rounded-xl bg-card px-1.5 text-xs text-foreground outline-none ring-1 ring-border sm:max-w-[12rem] md:max-w-[14rem] lg:max-w-[16rem]",
+  );
+
+  if (!mounted) {
+    return (
+      <header className="sticky top-0 z-20 flex h-11 min-w-0 items-center gap-1.5 bg-card/70 px-3 sm:gap-2 sm:px-5 backdrop-blur-md shadow-[0_1px_0_rgba(15,23,42,0.08)] dark:shadow-[0_1px_0_rgba(255,255,255,0.05)]">
+        {onOpenMobileMenu ? (
+          <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0 md:hidden" disabled aria-label="打开菜单">
+            <Menu className="h-5 w-5" />
+          </Button>
+        ) : null}
+        <div className="flex min-w-0 shrink-0 items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={BRAND_ICON_PATH} alt={BRAND_NAME} className="h-6 w-6 shrink-0 rounded-md" />
+          <span className="max-w-[4.5rem] truncate text-sm font-semibold text-foreground sm:max-w-none">
+            {BRAND_NAME}
+          </span>
         </div>
-        <span className="text-sm font-semibold text-foreground">Huiyan-AI Pro</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <select
-          className="h-8 min-w-[180px] rounded-xl bg-card px-2 text-xs text-foreground outline-none ring-1 ring-border sm:min-w-[240px]"
-          value={generationMode === "image" ? activeImageModel : activeModel}
-          onChange={(e) =>
-            generationMode === "image" ? setActiveImageModel(e.target.value) : setActiveModel(e.target.value)
-          }
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:gap-2">
+          <select className={selectClass} value="" disabled aria-label="模型加载中">
+            <option value="">模型加载中...</option>
+          </select>
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:bg-accent" disabled>
+            <Moon className="h-4 w-4" />
+          </Button>
+        </div>
+      </header>
+    );
+  }
+
+  return (
+    <header className="sticky top-0 z-20 flex h-11 min-w-0 items-center gap-1.5 bg-card/70 px-3 sm:gap-2 sm:px-5 backdrop-blur-md shadow-[0_1px_0_rgba(15,23,42,0.08)] dark:shadow-[0_1px_0_rgba(255,255,255,0.05)]">
+      {onOpenMobileMenu ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 shrink-0 md:hidden"
+          onClick={onOpenMobileMenu}
+          aria-label="打开侧栏与历史"
         >
-          {(generationMode === "image" ? (imageModels.length ? imageModels : models) : models).map((model) => (
+          <Menu className="h-5 w-5" />
+        </Button>
+      ) : null}
+      <div className="flex min-w-0 shrink-0 items-center gap-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={BRAND_ICON_PATH} alt={BRAND_NAME} className="h-6 w-6 shrink-0 rounded-md" />
+        <span className="min-w-0 max-w-[4.5rem] truncate text-sm font-semibold text-foreground sm:max-w-[10rem] lg:max-w-none">
+          {BRAND_NAME}
+        </span>
+      </div>
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:gap-2">
+        <select
+          className={selectClass}
+          value={selectValue}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (generationMode === "image") setActiveImageModel(v);
+            else setActiveModel(v);
+          }}
+        >
+          {currentModel && !modelOptions.includes(currentModel) ? (
+            <option key={currentModel} value={currentModel}>
+              {currentModel}（不在当前列表）
+            </option>
+          ) : null}
+          {modelOptions.map((model) => (
             <option key={model} value={model}>
               {model}
             </option>
@@ -49,10 +113,10 @@ export function TopBar() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 rounded-xl text-muted-foreground hover:bg-accent"
+          className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:bg-accent"
           onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
         >
-          {!mounted ? <Moon className="h-4 w-4" /> : resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
       </div>
     </header>

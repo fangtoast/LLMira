@@ -13,6 +13,14 @@ interface Props {
 }
 
 export function MarkdownRenderer({ content, className }: Props) {
+  const safeUrlTransform = (url: string) => {
+    const value = url.trim();
+    if (/^data:image\//i.test(value)) return value;
+    if (/^https?:\/\//i.test(value)) return value;
+    if (/^\//.test(value)) return value;
+    return "";
+  };
+
   return (
     <div
       className={cn(
@@ -23,6 +31,7 @@ export function MarkdownRenderer({ content, className }: Props) {
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
         rehypePlugins={[rehypeKatex]}
+        urlTransform={safeUrlTransform}
         components={{
           code(props) {
             const { children, className } = props;

@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="llmira-bg" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E293B"/>
+      <stop offset="1" stop-color="#0B1220"/>
+    </linearGradient>
+    <linearGradient id="llmira-m" x1="128" y1="128" x2="384" y2="384" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5B7CFF"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="40" y="40" width="432" height="432" rx="112" fill="url(#llmira-bg)"/>
+
+  <path
+    d="M140 358V176C140 156.118 156.118 140 176 140C188.425 140 199.977 146.27 206.646 156.688L256 233.752L305.354 156.688C312.023 146.27 323.575 140 336 140C355.882 140 372 156.118 372 176V358"
+    stroke="url(#llmira-m)"
+    stroke-width="42"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <circle cx="372" cy="140" r="18" fill="#22D3EE"/>
+</svg>
+

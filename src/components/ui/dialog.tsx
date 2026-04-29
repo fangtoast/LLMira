@@ -20,8 +20,18 @@ export function DialogContent({ className, children }: { className?: string; chi
   const ctx = React.useContext(DialogContext);
   if (!ctx?.open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className={cn("w-full max-w-lg rounded-lg border bg-card p-6", className)}>{children}</div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={() => ctx.onOpenChange(false)}
+    >
+      <div
+        className={cn("w-full max-w-lg rounded-lg border bg-card p-6", className)}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
+        {children}
+      </div>
     </div>
   );
 }
