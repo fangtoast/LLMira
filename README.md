@@ -2,6 +2,28 @@
 
 基于 Next.js 14 + TypeScript 的本地优先 AI 对话应用，默认对接慧言 OpenAI 兼容接口。
 
+## 文档与规范
+
+- 模块文档索引：[docs/README.md](docs/README.md)
+- 架构总览：[docs/engineering/architecture.md](docs/engineering/architecture.md)
+- 工程规范（Git、日志、注释）：[docs/engineering/CONTRIBUTING.md](docs/engineering/CONTRIBUTING.md)
+- Python 附录（若仓库含 `.py`）：[docs/engineering/python-appendix.md](docs/engineering/python-appendix.md)
+- Cursor 工程规则：[.cursor/rules/engineering-standards.mdc](.cursor/rules/engineering-standards.mdc)
+
+## 项目结构（精简）
+
+```text
+src/
+  app/           # App Router：页面与 error 边界
+  components/    # UI：chat、layout、markdown、modals、ui（Radix 封装）
+  hooks/         # useChat、useConversations、useModels 等
+  lib/           # api、db、store、logger、chat 工具
+  types/         # 共享 TS 类型与声明
+docs/
+  engineering/   # 架构、贡献指南、Python 附录
+  features/      # 按模块的功能说明
+```
+
 ## 功能特性
 
 ### 对话与交互
@@ -28,8 +50,8 @@
 - 文生图结果：网格展示，支持 **放大预览**、下载、复制链接、加载失败重试
 - Dexie.js **本地会话持久化**；侧栏支持按 **标题与消息正文** 搜索
 - 侧栏 **重命名** 会话，支持导出 **JSON / Markdown / 纯文本**，以及 **导入 JSON**
-- 宽屏下 **Artifacts** 右侧面板（代码或 HTML 片段预览）
-- 开发模式下 pino 日志：`[Request Model]`、`[Stream Start]`、`[Token Count]`
+- 宽屏下右侧 **提问导览**（轨道悬停展开；点击定位到对应用户消息）与 **Artifacts** 面板可切换（代码或 HTML 片段预览）
+- **结构化日志**：统一 `@/lib/logger`，分级与 JSON 行输出（生产）；业务打点含 `[Request Model]`、`[Stream Start]`、`[Token Count]`（见「日志链路」）
 
 ### 其他
 
@@ -82,7 +104,9 @@ npm run lint
 
 ## 日志链路
 
-开发模式下会打印：
+应用代码请使用 `@/lib/logger`（分级：`debug` / `info` / `warn` / `error`）。可通过环境变量 `NEXT_PUBLIC_LOG_LEVEL` 或 `LOG_LEVEL` 控制最低级别（默认 `info`）。
+
+开发模式下常见业务打点包括：
 
 - `[Request Model]`
 - `[Stream Start]`

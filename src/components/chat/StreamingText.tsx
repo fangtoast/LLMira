@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/components/chat/StreamingText.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @description 逐字展示动画（演示用）；与真实 SSE 流独立。
+ */
 import { useEffect, useState } from "react";
 
 interface Props {

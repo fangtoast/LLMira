@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/components/chat/WelcomePanel.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 空会话问候语与励志短句
+ * @description 文案依赖 `useSettingsStore` 与 `pickQuoteByConversationId`。
+ */
 import { useMemo } from "react";
 import { Bot } from "lucide-react";
 import { pickQuoteByConversationId } from "@/lib/quotes";
@@ -12,6 +21,7 @@ function getGreetingByHour(hour: number, displayName: string) {
   return `晚上好，${displayName}~`;
 }
 
+/** 无消息时的欢迎区。 */
 export function WelcomePanel({ conversationId }: { conversationId?: string | null }) {
   const { userAvatarText, userName } = useSettingsStore();
   const { greeting, quote } = useMemo(() => {

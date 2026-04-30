@@ -1,3 +1,10 @@
+/**
+ * @project LLMira
+ * @file src/components/ui/dropdown-menu.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @description Radix DropdownMenu 再导出与样式封装。
+ */
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { cn } from "@/lib/utils";
 

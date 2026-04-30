@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/hooks/useConversations.ts
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - Dexie CRUD、加载消息（稳定排序）、搜索、导入导出入口
+ * @description 与 `useChatStore` 同步消息列表；标题由首条用户消息推导。
+ */
 import { useCallback, useMemo } from "react";
 import type { ExportedChat } from "@/lib/chat/exportImport";
 import { db, type ConversationRecord } from "@/lib/db/dexie";
@@ -10,6 +19,9 @@ function uid() {
   return crypto.randomUUID();
 }
 
+/**
+ * 会话持久化与列表操作（Dexie），并与全局 chat store 同步。
+ */
 export function useConversations() {
   const { conversations, setConversations, activeConversationId, setActiveConversationId, setMessages } =
     useChatStore();

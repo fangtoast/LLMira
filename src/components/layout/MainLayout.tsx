@@ -1,4 +1,14 @@
 "use client";
+
+/**
+ * @project LLMira
+ * @file src/components/layout/MainLayout.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 三栏骨架：侧栏、对话区、右侧导览或 Artifacts
+ * @description 连接 `useChat`、加载 Dexie 消息、装配 TopBar/ChatWindow/InputBar。
+ */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { ChatWindow } from "@/components/chat/ChatWindow";
@@ -16,6 +26,7 @@ import { useIsMdUp } from "@/hooks/useMediaQuery";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
+/** 聊天应用主壳层。 */
 export function MainLayout() {
   const {
     sendMessage,

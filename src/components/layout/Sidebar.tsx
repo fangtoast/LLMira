@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/components/layout/Sidebar.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 会话列表、搜索、导入导出、设置入口、折叠宽度
+ * @description 小屏抽屉 / 桌面固定栏；与 `useConversations` 同步。
+ */
 import { useEffect, useRef, useState } from "react";
 import { Download, Pencil, Plus, ChevronLeft, ChevronRight, Settings2, Trash2, Upload, X } from "lucide-react";
 import {
@@ -25,6 +34,7 @@ type SidebarProps = {
   onMobileClose?: () => void;
 };
 
+/** 左侧会话与设置侧栏。 */
 export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const isMdUp = useIsMdUp();
   const [keyword, setKeyword] = useState("");

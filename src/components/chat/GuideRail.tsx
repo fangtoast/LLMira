@@ -1,10 +1,20 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/components/chat/GuideRail.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 右侧提问导览轨道；悬停展开列表并定位用户消息
+ * @description 仅宽屏展示；活跃项高亮与品牌蓝一致。
+ */
 import { useEffect, useRef, useState } from "react";
 import { AppWindow, Map } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+/** 单条导览（对应一条用户提问，标题已截断）。 */
 export type GuideItem = {
   id: string;
   title: string;
@@ -17,6 +27,7 @@ interface GuideRailProps {
   onSwitchToArtifacts: () => void;
 }
 
+/** 桌面端右侧：竖条轨迹 + 悬停详情卡片。 */
 export function GuideRail({ items, activeId, onJump, onSwitchToArtifacts }: GuideRailProps) {
   const [expanded, setExpanded] = useState(false);
   const leaveTimerRef = useRef<number | null>(null);

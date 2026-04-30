@@ -1,3 +1,10 @@
+/**
+ * @project LLMira
+ * @file src/components/ui/dialog.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @description 轻量受控 Dialog（Context + 遮罩），非 Radix 完整封装。
+ */
 import * as React from "react";
 import { cn } from "@/lib/utils";
 

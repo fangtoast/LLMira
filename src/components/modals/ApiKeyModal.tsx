@@ -1,11 +1,21 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/components/modals/ApiKeyModal.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 首次或缺失 Key 时引导填写并写入 settings store
+ * @description 与 `useChat` 无 Key 时打开弹窗联动。
+ */
 import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 
+/** 全局 API Key 配置对话框（受 store 的 `apiKeyModalOpen` 控制）。 */
 export function ApiKeyModal() {
   const { apiKeyModalOpen, setApiKeyModalOpen, setApiKey } = useSettingsStore();
   const [value, setValue] = useState("");

@@ -1,3 +1,10 @@
+/**
+ * @project LLMira
+ * @file src/components/ui/select.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @description 轻量受控 Select（Context），供部分表单使用。
+ */
 import * as React from "react";
 
 type SelectContextType = { value?: string; onChange?: (v: string) => void };

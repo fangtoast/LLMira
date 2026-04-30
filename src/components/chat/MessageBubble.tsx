@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/components/chat/MessageBubble.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 单条消息 UI：Markdown、思考折叠、图片网格、编辑/复制/重试
+ * @description 助手侧解析遗留 `<think>` 标签展示思考内容（兼容部分网关）。
+ */
 import { memo, useEffect, useState } from "react";
 import { Check, Copy, Download, Pencil, RefreshCw, Trash2, ChevronDown, ZoomIn } from "lucide-react";
 import { MarkdownRenderer } from "@/components/markdown/MarkdownRenderer";
@@ -301,6 +310,7 @@ function MessageBubbleImpl({
   );
 }
 
+/** 单条聊天气泡（memo 优化重渲染）。 */
 export const MessageBubble = memo(
   MessageBubbleImpl,
   (prev, next) =>

@@ -1,3 +1,13 @@
+/**
+ * @project LLMira
+ * @file src/lib/api/client.ts
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - OpenAI 兼容 HTTP：模型列表、流式对话、文生图
+ *   - SSE 行解析与推理 token 抽取
+ * @description 浏览器侧直连 `NEXT_PUBLIC_API_BASE_URL`；依赖 `@/lib/logger` 打点与 `@/lib/api/types` 请求体定义。
+ */
 import { logger } from "@/lib/logger";
 import type { TokenUsage } from "@/types";
 import { extractModelIdsFromResponse } from "./parseModelsResponse";
@@ -50,6 +60,11 @@ function getHeaders(apiKey: string) {
   };
 }
 
+/**
+ * GET `/v1/models`，将任意兼容 JSON 转为模型 id 列表。
+ *
+ * @throws Error 当 HTTP 非成功或 JSON 非法时
+ */
 export async function fetchModels(apiKey: string): Promise<string[]> {
   const res = await fetch(`${baseUrl}/v1/models`, {
     headers: getHeaders(apiKey),
@@ -108,6 +123,11 @@ function withRequestTimeout(signal?: AbortSignal, timeoutMs = 30000): AbortSigna
   return ac.signal;
 }
 
+/**
+ * POST `/v1/chat/completions`（stream），解析 SSE `data:` 行并驱动回调。
+ *
+ * @remarks 中止时触发 `onAbort`；非中止错误向上抛出，由调用方处理。
+ */
 export async function streamChatCompletion(
   apiKey: string,
   payload: ChatCompletionRequest,
@@ -179,7 +199,7 @@ export async function streamChatCompletion(
             };
           }
         } catch (error) {
-          logger.warn({ error }, "stream parse line failed");
+          logger.exception(error, "stream parse line failed");
         }
       }
     }
@@ -205,6 +225,9 @@ export async function streamChatCompletion(
   }
 }
 
+/**
+ * POST `/v1/images/generations`，返回图片 URL 列表（含 content 中解析的链接兜底）。
+ */
 export async function generateImage(
   apiKey: string,
   payload: ImageGenerationRequest,

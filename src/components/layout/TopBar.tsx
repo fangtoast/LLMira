@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/components/layout/TopBar.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 品牌、模型下拉、主题切换、移动端菜单入口
+ * @description 模型列表来自 `useModels`；宽度需避免挤压 logo。
+ */
 import { useEffect, useState } from "react";
 import { Menu, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -10,9 +19,11 @@ import { BRAND_ICON_PATH, BRAND_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 type TopBarProps = {
+  /** 打开移动端侧栏时的回调 */
   onOpenMobileMenu?: () => void;
 };
 
+/** 顶栏：品牌区 + 模型选择 + 明暗切换。 */
 export function TopBar({ onOpenMobileMenu }: TopBarProps) {
   const { setTheme, resolvedTheme } = useTheme();
   const {

@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/components/artifacts/ArtifactsPanel.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 宽屏右侧预览助手消息中的代码/HTML 片段
+ * @description 与 `GuideRail` 在 MainLayout 中互斥切换展示。
+ */
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ListTree } from "lucide-react";
@@ -10,6 +19,7 @@ interface Props {
   onSwitchToGuide?: () => void;
 }
 
+/** `open` 为 false 时不渲染（不占布局）。 */
 export function ArtifactsPanel({ content, open, onSwitchToGuide }: Props) {
   if (!open) return null;
   return (

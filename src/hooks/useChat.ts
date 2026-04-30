@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/hooks/useChat.ts
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 发送消息、流式/图生、重试、编辑重发、删除
+ * @description 编排 `useChatStore`、`useConversations` 与 `lib/api/client`；会话切换时中止流。
+ */
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { buildApiMessagesFromChat } from "@/lib/chat/buildMessages";
 import { generateImage, streamChatCompletion } from "@/lib/api/client";
@@ -24,6 +33,11 @@ function isImageModel(modelName?: string): boolean {
   return /(image|mj|dall|flux|sd|gpt-image)/i.test(modelName);
 }
 
+/**
+ * 聊天发送与生成编排入口。
+ *
+ * @remarks 返回对象包含 `sendMessage`、`loading`、`stopGeneration` 等，供页面与输入条绑定。
+ */
 export function useChat() {
   const {
     apiKey,

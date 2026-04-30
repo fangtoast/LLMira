@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/app/error.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 全局路由错误边界 UI 与日志
+ * @description Next.js `error.tsx`；错误经 `logger.exception` 记录。
+ */
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { logger } from "@/lib/logger";
@@ -12,7 +21,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    logger.error({ error }, "global route error");
+    logger.exception(error, "global route error");
   }, [error]);
 
   return (

@@ -1,6 +1,12 @@
 /**
- * 兼容 OpenAI 及常见变体：/v1/models 的 JSON 可能为 data 数组、
- * 根级数组、或 { models | list } 等。
+ * @project LLMira
+ * @file src/lib/api/parseModelsResponse.ts
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 从 `/v1/models` 多种 JSON 形态抽取模型 id
+ *   - 读取环境变量预设列表
+ * @description Why：各网关返回结构不一致，集中容错避免改对接层多处分支。
  */
 
 function isNonEmptyString(v: unknown): v is string {
@@ -49,7 +55,7 @@ function walkArray(arr: unknown, out: Set<string>) {
 }
 
 /**
- * 从 /v1/models 或兼容接口的任意 JSON 中提取模型 id 列表。
+ * 从 `/v1/models` 或兼容接口的任意 JSON 中提取模型 id 列表（去重无序转数组）。
  */
 export function extractModelIdsFromResponse(json: unknown): string[] {
   const out = new Set<string>();
@@ -92,8 +98,7 @@ export function extractModelIdsFromResponse(json: unknown): string[] {
 }
 
 /**
- * 逗号分隔的额外/兜底模型，来自环境变量，例如：
- * NEXT_PUBLIC_MODEL_PRESET=gpt-5,gpt-4,deepseek-chat
+ * 逗号分隔的额外/兜底模型，来自 `NEXT_PUBLIC_MODEL_PRESET`。
  */
 export function getPresetModelsFromEnv(): string[] {
   const raw = process.env.NEXT_PUBLIC_MODEL_PRESET;

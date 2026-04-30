@@ -1,3 +1,10 @@
+/**
+ * @project LLMira
+ * @file src/components/ui/button.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @description Radix Slot + cva 变体按钮（shadcn 风格封装）。
+ */
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";

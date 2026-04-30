@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/components/markdown/CodeBlock.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - Prism 高亮、复制、限高折叠
+ * @description 语言包按需动态 import，减少首包体积。
+ */
 import { useEffect, useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +28,7 @@ function escapeHtml(s: string) {
     .replace(/"/g, "&quot;");
 }
 
+/** fenced code 块对应的语法高亮区域。 */
 export function CodeBlock({ code, language }: Props) {
   const [copied, setCopied] = useState(false);
   const [html, setHtml] = useState(() => escapeHtml(code));

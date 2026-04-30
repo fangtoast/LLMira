@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/components/chat/InputBar.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 多行输入、附件、发送/停止、可选深度思考
+ * @description 字符上限来自 `NEXT_PUBLIC_INPUT_MAX_CHARS`。
+ */
 import { useEffect, useRef, useState, type ClipboardEvent, type ClipboardEventHandler } from "react";
 import { ArrowUp, FileUp, Sparkles, Square, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +34,7 @@ interface AttachmentItem {
   dataUrl?: string;
 }
 
+/** 底部输入条：聚合附件 data URL 后调用 `onSend`。 */
 export function InputBar({
   onSend,
   onStop,

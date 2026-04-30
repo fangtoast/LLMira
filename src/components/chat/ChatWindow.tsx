@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/components/chat/ChatWindow.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 消息列表滚动区、回到底部、可见用户消息上报（导览高亮）
+ * @description 每条消息挂载 `msg-${id}` 锚点供右侧导览跳转。
+ */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +19,7 @@ import { cn } from "@/lib/utils";
 
 const SCROLL_BOTTOM_THRESHOLD = 72;
 
+/** 中部可滚动消息列表容器。 */
 export function ChatWindow({
   messages,
   conversationId,

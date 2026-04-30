@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/hooks/useModels.ts
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 拉取并合并远程模型列表与环境预设
+ * @description 依赖 `apiKey`；列表过少时用 `NEXT_PUBLIC_MODEL_PRESET` 补足。
+ */
 import { useEffect, useState } from "react";
 import { fetchModels } from "@/lib/api/client";
 import { getPresetModelsFromEnv } from "@/lib/api/parseModelsResponse";
@@ -18,6 +27,9 @@ function mergeWithPresetWhenSparse(ids: string[]): string[] {
   return unique.length > 0 ? unique : [...ULTIMATE_FALLBACK];
 }
 
+/**
+ * @returns 模型 id 字符串数组，供 TopBar 等下拉使用
+ */
 export function useModels() {
   const { apiKey } = useSettingsStore();
   const [models, setModels] = useState<string[]>(() =>

@@ -1,3 +1,12 @@
+/**
+ * @project LLMira
+ * @file src/app/layout.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 根 HTML、字体、主题提供者
+ * @description App Router 根布局；元数据引用 `@/lib/brand`。
+ */
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
@@ -31,6 +40,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+/** 应用根布局：字体变量与明暗主题。 */
 export default function RootLayout({
   children,
 }: Readonly<{

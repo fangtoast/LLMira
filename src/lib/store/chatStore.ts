@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/lib/store/chatStore.ts
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - 当前会话列表、按会话存消息、流式补丁与加载态
+ * @description 与 Dexie 通过 `useConversations` 同步；不做持久化本身。
+ */
 import { create } from "zustand";
 import type { ChatMessage, Conversation, TokenUsage } from "@/types";
 
@@ -32,6 +41,7 @@ interface ChatState {
   setLastTokenUsage: (usage?: TokenUsage) => void;
 }
 
+/** 对话运行时状态（内存）；活跃会话 id 与每条会话的消息数组。 */
 export const useChatStore = create<ChatState>((set) => ({
   conversations: [],
   activeConversationId: null,

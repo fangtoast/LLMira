@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/lib/store/settingsStore.ts
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - API Key、模型、生成参数、侧栏状态等持久化设置
+ * @description Zustand persist → localStorage；SSR 使用内存 storage 占位。
+ */
 import { create } from "zustand";
 import { createJSONStorage, type StateStorage, persist } from "zustand/middleware";
 
@@ -68,6 +77,7 @@ interface SettingsState {
   setApiKeyModalOpen: (open: boolean) => void;
 }
 
+/** 用户级设置（含密钥与模型选择），详见 `partialize` 持久化字段。 */
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({

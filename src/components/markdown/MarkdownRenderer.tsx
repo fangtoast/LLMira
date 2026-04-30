@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @project LLMira
+ * @file src/components/markdown/MarkdownRenderer.tsx
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date 2026-04-30
+ * @function
+ *   - Markdown + KaTeX；代码块委托 `CodeBlock`
+ * @description `urlTransform` 限制危险协议，减轻 XSS 面。
+ */
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -12,6 +21,7 @@ interface Props {
   className?: string;
 }
 
+/** 助手正文渲染入口。 */
 export function MarkdownRenderer({ content, className }: Props) {
   const safeUrlTransform = (url: string) => {
     const value = url.trim();

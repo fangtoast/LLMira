@@ -1,0 +1,54 @@
+---
+description: LLMira 工程化规范（Git、日志、JSDoc 文件头、文档与提交习惯）
+alwaysApply: true
+---
+
+# 工程化准则（LLMira）
+
+与 [`AGENTS.md`](AGENTS.md) 中的 Next.js 说明互补：本规则侧重 **Git、日志、注释、文档**；实现 Next 功能时仍须遵守 `AGENTS.md` 中关于 Next 14 的约束。
+
+## Git 与提交
+
+- 采用 **功能驱动的原子提交**；一个 PR/一次合并尽量对应清晰主题。
+- 提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/)，例如：`feat(chat): ...`、`fix(api): ...`、`docs: ...`、`refactor: ...`、`chore: ...`。
+- 完成一个可合并的逻辑闭环时，在助手回复**末尾**附带一行建议命令示例：`git commit -m 'feat(scope): 简述'`（若本次已形成闭环）。
+
+## 日志
+
+- **禁止**在业务代码中使用裸 `console.log` / `console.warn` / `console.error` / `console.debug`（`src/lib/logger.ts` 内部实现除外）。
+- 统一使用 [`src/lib/logger.ts`](src/lib/logger.ts) 导出的 `logger`：`debug` / `info` / `warn` / `error`。
+- 捕获的异常须记录完整上下文；优先使用 `logger.exception(err, "说明", { 可选上下文 })`（或等价：先 `logger.error` 再附带对象），避免吞掉堆栈。
+- 日志内容避免泄露密钥、完整 API Key、Cookie；字段需脱敏。
+
+## 文件头（TypeScript / TSX）
+
+每个**新建**或**大幅修改**的源文件顶部使用 **JSDoc** 块（可按需精简，但作者与 Description 建议保留）：
+
+```ts
+/**
+ * @project LLMira
+ * @file 相对路径/文件名
+ * @author fangtoast <fangtoast@foxmail.com>
+ * @date YYYY-MM-DD
+ * @function
+ *   - 职责要点 1
+ *   - 职责要点 2
+ * @description 本模块在系统中的角色，依赖（如 store、logger、API 客户端）及边界。
+ */
+```
+
+## 注释与类型
+
+- 对外导出函数、React 组件（默认导出）、自定义 Hook：须有 **JSDoc**，说明参数、返回值；复杂副作用写在 `@remarks` 或描述中。
+- 公共 API 须有明确 **TypeScript 类型**（避免隐式 `any`）。
+- 复杂分支、非显而易见的算法或边界处理：写清 **Why**（设计取舍），避免复述代码。
+
+## 文档
+
+- 可交付的功能模块完成后，**主动询问**是否起草或更新 `docs/features/<feature-name>.md`（可使用 [`docs/templates/feature-module.md`](docs/templates/feature-module.md)）。
+- 重大功能上线前，更新根目录 [`README.md`](README.md) 的 **功能特性** 小节。
+- 人类可读的总览见 [`docs/engineering/CONTRIBUTING.md`](docs/engineering/CONTRIBUTING.md)。
+
+## Python（若仓库中出现 `.py` 文件）
+
+完整模版与 docstring 示例见 [`docs/engineering/python-appendix.md`](docs/engineering/python-appendix.md)。概要：三引号文件头（与 TS 信息字段对齐）、类型注解、Google/NumPy 风格 docstring；可在 `.cursor/rules/` 新增 `globs: **/*.py` 的规则引用该文档。
