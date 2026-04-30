@@ -11,6 +11,18 @@ import type { ChatMessage, Conversation } from "@/types";
 
 const EXPORT_VERSION = 1 as const;
 
+/** 全量多会话备份版本（与单会话 `ExportedChat` 的 version=1 区分）。 */
+export const FULL_BACKUP_VERSION = 2 as const;
+
+export type ExportedFullBackup = {
+  version: typeof FULL_BACKUP_VERSION;
+  exportedAt: number;
+  chats: Array<{
+    conversation: Conversation & { keyword?: string };
+    messages: ChatMessage[];
+  }>;
+};
+
 /** 单份可导入的会话快照结构。 */
 export type ExportedChat = {
   version: typeof EXPORT_VERSION;
@@ -58,6 +70,51 @@ export function exportConversationPlain(messages: ChatMessage[]): string {
  *
  * @throws Error 格式或版本不兼容时
  */
+/** 根据当前内存中的会话列表与消息映射生成全量备份对象。 */
+export function buildFullBackupPayload(
+  conversations: Conversation[],
+  messagesByConversation: Record<string, ChatMessage[]>,
+): ExportedFullBackup {
+  const chats = conversations.map((conversation) => ({
+    conversation,
+    messages: messagesByConversation[conversation.id] ?? [],
+  }));
+  return {
+    version: FULL_BACKUP_VERSION,
+    exportedAt: Date.now(),
+    chats,
+  };
+}
+
+export function stringifyFullBackup(payload: ExportedFullBackup): string {
+  return JSON.stringify(payload, null, 2);
+}
+
+/**
+ * 解析全量备份 JSON。
+ *
+ * @throws Error 格式或版本不兼容时
+ */
+export function parseImportedFullBackupJson(text: string): ExportedFullBackup {
+  const data = JSON.parse(text) as unknown;
+  if (!data || typeof data !== "object") throw new Error("无效的 JSON");
+  const o = data as Record<string, unknown>;
+  if (o.version !== FULL_BACKUP_VERSION) throw new Error("不是全量备份文件（version 应为 2）");
+  if (!Array.isArray(o.chats)) throw new Error("缺少 chats 数组");
+  return data as ExportedFullBackup;
+}
+
+/** 触发浏览器下载 JSON 文件。 */
+export function downloadJsonFile(filename: string, json: string): void {
+  const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function parseImportedChatJson(text: string): ExportedChat {
   const data = JSON.parse(text) as unknown;
   if (!data || typeof data !== "object") throw new Error("无效的 JSON");

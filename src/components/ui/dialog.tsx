@@ -28,11 +28,11 @@ export function DialogContent({ className, children }: { className?: string; chi
   if (!ctx?.open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black"
       onClick={() => ctx.onOpenChange(false)}
     >
       <div
-        className={cn("w-full max-w-lg rounded-lg border bg-card p-6", className)}
+        className={cn("w-full max-w-lg rounded-lg border bg-card p-6 text-card-foreground shadow-2xl", className)}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

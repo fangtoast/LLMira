@@ -10,7 +10,7 @@
  * @description 模型列表来自 `useModels`；宽度需避免挤压 logo。
  */
 import { useEffect, useState } from "react";
-import { Menu, Moon, Sun } from "lucide-react";
+import { Menu, Moon, Sun, Trash2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { useSettingsStore } from "@/lib/store/settingsStore";
@@ -21,10 +21,21 @@ import { cn } from "@/lib/utils";
 type TopBarProps = {
   /** 打开移动端侧栏时的回调 */
   onOpenMobileMenu?: () => void;
+  /** 当前会话 id（与 hydrated 同时满足时才展示删除入口） */
+  activeConversationId?: string | null;
+  /** IndexedDB 引导完成 */
+  hydrated?: boolean;
+  /** 删除当前会话（由外层弹出确认框并调用 Dexie 删除） */
+  onDeleteCurrentConversation?: () => void;
 };
 
 /** 顶栏：品牌区 + 模型选择 + 明暗切换。 */
-export function TopBar({ onOpenMobileMenu }: TopBarProps) {
+export function TopBar({
+  onOpenMobileMenu,
+  activeConversationId,
+  hydrated,
+  onDeleteCurrentConversation,
+}: TopBarProps) {
   const { setTheme, resolvedTheme } = useTheme();
   const {
     activeModel,
@@ -121,6 +132,19 @@ export function TopBar({ onOpenMobileMenu }: TopBarProps) {
             </option>
           ))}
         </select>
+        {hydrated && activeConversationId && onDeleteCurrentConversation ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+            onClick={onDeleteCurrentConversation}
+            aria-label="删除当前会话"
+            title="删除当前会话"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        ) : null}
         <Button
           variant="ghost"
           size="icon"

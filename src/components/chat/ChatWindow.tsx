@@ -21,6 +21,7 @@ const SCROLL_BOTTOM_THRESHOLD = 72;
 
 /** 中部可滚动消息列表容器。 */
 export function ChatWindow({
+  hydrated = true,
   messages,
   conversationId,
   loading,
@@ -31,6 +32,8 @@ export function ChatWindow({
   onRegenerate,
   onActiveUserMessageChange,
 }: {
+  /** false 时在 Dexie 引导完成前展示占位，避免欢迎页闪烁 */
+  hydrated?: boolean;
   messages: ChatMessage[];
   conversationId?: string | null;
   loading: boolean;
@@ -118,6 +121,15 @@ export function ChatWindow({
       observer.disconnect();
     };
   }, [messages, onActiveUserMessageChange]);
+
+  if (!hydrated) {
+    return (
+      <div className="relative flex h-full flex-col items-center justify-center px-3 text-sm text-muted-foreground">
+        <div className="h-8 w-8 animate-pulse rounded-full bg-muted" aria-hidden />
+        <p className="mt-3">正在恢复本地会话…</p>
+      </div>
+    );
+  }
 
   return (
     <div

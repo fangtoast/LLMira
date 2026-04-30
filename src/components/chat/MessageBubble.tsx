@@ -153,12 +153,12 @@ function MessageBubbleImpl({
       {isUser ? (
         <div className="flex max-w-[min(100%,32rem)] flex-col items-end gap-1.5">
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-            <span className="font-medium tracking-tight">{message.senderName ?? "Xiao"}</span>
+            <span className="font-medium tracking-tight">{message.senderName?.trim() || "Xiao"}</span>
             <span
               className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/60 bg-muted/50 text-[11px] font-semibold text-foreground"
               aria-hidden
             >
-              {message.senderAvatar ?? "潇"}
+              {message.senderAvatar?.trim() || "潇"}
             </span>
             <div className="ml-1 flex items-center gap-0.5 opacity-0 transition group-hover/msg:opacity-100">
               <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={doCopy} title="复制">

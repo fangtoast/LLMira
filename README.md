@@ -71,7 +71,7 @@ docs/
 npm install
 ```
 
-2. 配置环境变量
+1. 配置环境变量
 
 ```bash
 cp .env.example .env.local
@@ -82,12 +82,13 @@ cp .env.example .env.local
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://api.huiyan-ai.cn
 # 可选：模型下拉偏少或拉取失败时，用英文/中文逗号列出常用 id，与接口结果合并
+# 注：此处的url `https://api.huiyan-ai.cn` 可以替换为其他api厂家
 # NEXT_PUBLIC_MODEL_PRESET=gpt-5-chat,deepseek-chat
 # 可选：输入框最大字符数（默认 16000）
 # NEXT_PUBLIC_INPUT_MAX_CHARS=16000
 ```
 
-3. 启动开发服务
+1. 启动开发服务
 
 ```bash
 npm run dev
@@ -95,7 +96,7 @@ npm run dev
 
 访问 `http://localhost:3000`（会重定向到 `/chat`）。
 
-4. 构建与检查
+1. 构建与检查
 
 ```bash
 npm run build
@@ -119,11 +120,19 @@ docker build -t llmira .
 docker run --rm -p 3000:3000 --env NEXT_PUBLIC_API_BASE_URL=https://api.huiyan-ai.cn llmira
 ```
 
-## Git 提交规范
+## 页面展示
 
-使用 [Conventional Commits](https://www.conventionalcommits.org/)，例如：
+### 页面整体（暗色主题）
+![页面整体（暗色）](./images/LLMira.png)
 
-- `feat: ...`
-- `fix: ...`
-- `refactor: ...`
-- `docs: ...`
+### 页面整体（亮色主题）
+![页面整体（亮色）](./images/LLMira(light).png)
+
+### 切换文生图模式
+![切换文生图模式](./images/select%20tool.png)
+
+### 设置模型参数
+![设置模型参数](./images/settings.png)
+
+### 切换模型
+![切换模型](./images/select%20model.png)

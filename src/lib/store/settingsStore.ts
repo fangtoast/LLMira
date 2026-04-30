@@ -96,8 +96,9 @@ export const useSettingsStore = create<SettingsState>()(
       sidebarCollapsed: false,
       apiKeyModalOpen: false,
       setApiKey: (apiKey) => set({ apiKey }),
-      setUserName: (userName) => set({ userName: userName || "Xiao" }),
-      setUserAvatarText: (userAvatarText) => set({ userAvatarText: (userAvatarText || "潇").slice(0, 2) }),
+      /** 允许空字符串，便于在输入框中删除后重新输入；界面展示处再用默认值兜底 */
+      setUserName: (userName) => set({ userName }),
+      setUserAvatarText: (userAvatarText) => set({ userAvatarText: userAvatarText.slice(0, 2) }),
       setActiveModel: (activeModel) => set({ activeModel }),
       setActiveImageModel: (activeImageModel) => set({ activeImageModel }),
       setGenerationMode: (generationMode) => set({ generationMode }),

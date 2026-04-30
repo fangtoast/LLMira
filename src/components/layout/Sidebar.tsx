@@ -9,13 +9,14 @@
  *   - 会话列表、搜索、导入导出、设置入口、折叠宽度
  * @description 小屏抽屉 / 桌面固定栏；与 `useConversations` 同步。
  */
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Download, Pencil, Plus, ChevronLeft, ChevronRight, Settings2, Trash2, Upload, X } from "lucide-react";
 import {
   exportConversationJson,
   exportConversationMarkdown,
   exportConversationPlain,
   parseImportedChatJson,
+  parseImportedFullBackupJson,
 } from "@/lib/chat/exportImport";
 import { useConversations } from "@/hooks/useConversations";
 import { useChatStore } from "@/lib/store/chatStore";
@@ -60,24 +61,23 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   } = useSettingsStore();
   const {
     conversations,
-    loadAll,
     createConversation,
     deleteConversation,
     searchConversations,
     importFromExport,
+    exportFullBackupDownload,
+    importFullBackupMerge,
+    importFullBackupReplace,
     renameConversation,
     setActiveConversationId,
     activeConversationId,
   } = useConversations();
   const { messagesByConversation } = useChatStore();
   const importRef = useRef<HTMLInputElement>(null);
+  const fullBackupImportRef = useRef<HTMLInputElement>(null);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-
-  useEffect(() => {
-    void loadAll();
-  }, [loadAll]);
 
   const activeConv = conversations.find((c) => c.id === activeConversationId);
   const activeMessages = activeConversationId ? (messagesByConversation[activeConversationId] ?? []) : [];
@@ -204,6 +204,28 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               <Upload className="mr-0.5 h-3 w-3" />
               导入
             </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 flex-1 rounded-lg text-[10px]"
+              onClick={() => void exportFullBackupDownload()}
+              title="导出全部会话到单个 JSON 文件"
+            >
+              <Download className="mr-0.5 h-3 w-3" />
+              全量备份
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 flex-1 rounded-lg text-[10px]"
+              onClick={() => fullBackupImportRef.current?.click()}
+              title="从全量备份 JSON 合并或替换恢复"
+            >
+              <Upload className="mr-0.5 h-3 w-3" />
+              导入全量
+            </Button>
             <input
               ref={importRef}
               type="file"
@@ -219,6 +241,35 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                   await importFromExport(data);
                 } catch (err) {
                   window.alert(err instanceof Error ? err.message : "导入失败");
+                }
+              }}
+            />
+            <input
+              ref={fullBackupImportRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f) return;
+                try {
+                  const text = await f.text();
+                  const data = parseImportedFullBackupJson(text);
+                  const merge = window.confirm(
+                    "「确定」：合并——将备份中的会话追加为新会话（保留现有数据）。\n「取消」：进入下一步，可选择清空本地并用备份替换。",
+                  );
+                  if (merge) {
+                    await importFullBackupMerge(data);
+                    return;
+                  }
+                  const replace = window.confirm(
+                    "即将清空本浏览器中的全部会话与消息，并用备份文件替换。\n此操作不可撤销。确定继续？",
+                  );
+                  if (!replace) return;
+                  await importFullBackupReplace(data);
+                } catch (err) {
+                  window.alert(err instanceof Error ? err.message : "全量导入失败");
                 }
               }}
             />

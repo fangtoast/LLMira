@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
+import { bootstrapSessionFromIndexedDb } from "@/lib/chat/bootstrapSession";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { GuideRail, type GuideItem } from "@/components/chat/GuideRail";
 import { InputBar } from "@/components/chat/InputBar";
@@ -38,8 +39,8 @@ export function MainLayout() {
     retryLast,
     clearClientNotice,
   } = useChat();
-  const { loadMessages } = useConversations();
-  const { activeConversationId, messagesByConversation, lastTokenUsage, clientNotice } = useChatStore();
+  const { loadMessages, deleteConversation } = useConversations();
+  const { activeConversationId, messagesByConversation, lastTokenUsage, clientNotice, hydrated } = useChatStore();
   const messages = useMemo(
     () => (activeConversationId ? (messagesByConversation[activeConversationId] ?? []) : []),
     [activeConversationId, messagesByConversation],
@@ -52,10 +53,23 @@ export function MainLayout() {
   }, [messages]);
 
   useEffect(() => {
-    if (activeConversationId) {
-      void loadMessages(activeConversationId);
-    }
-  }, [activeConversationId, loadMessages]);
+    void bootstrapSessionFromIndexedDb();
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated || !activeConversationId) return;
+    void loadMessages(activeConversationId);
+  }, [activeConversationId, hydrated, loadMessages]);
+
+  const confirmDeleteCurrentConversation = useCallback(() => {
+    const id = useChatStore.getState().activeConversationId;
+    if (!id) return;
+    const ok = window.confirm(
+      "确定删除当前会话？本地消息将一并删除。可先使用侧栏「全量备份」导出后再删。",
+    );
+    if (!ok) return;
+    void deleteConversation(id);
+  }, [deleteConversation]);
 
   const isMdUp = useIsMdUp();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -129,7 +143,12 @@ export function MainLayout() {
         onMobileClose={() => setMobileSidebarOpen(false)}
       />
       <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden bg-card/65 shadow-[inset_24px_0_36px_-28px_rgba(0,0,0,0.15)] dark:bg-zinc-900/96 dark:shadow-[inset_24px_0_36px_-28px_rgba(0,0,0,0.42)] md:min-w-0">
-        <TopBar onOpenMobileMenu={() => setMobileSidebarOpen(true)} />
+        <TopBar
+          onOpenMobileMenu={() => setMobileSidebarOpen(true)}
+          activeConversationId={activeConversationId}
+          hydrated={hydrated}
+          onDeleteCurrentConversation={confirmDeleteCurrentConversation}
+        />
         {clientNotice ? (
           <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
             <span className="min-w-0 flex-1">{clientNotice}</span>
@@ -143,6 +162,7 @@ export function MainLayout() {
         ) : null}
         <div className="min-h-0 flex-1">
           <ChatWindow
+            hydrated={hydrated}
             messages={messages}
             conversationId={activeConversationId}
             loading={loading}
