@@ -10,7 +10,7 @@
  * @description 助手侧解析遗留 `<think>` 标签展示思考内容（兼容部分网关）。
  */
 import { memo, useEffect, useState } from "react";
-import { Check, Copy, Download, Pencil, RefreshCw, Trash2, ChevronDown, ZoomIn } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileText, Pencil, RefreshCw, Trash2, ZoomIn } from "lucide-react";
 import { MarkdownRenderer } from "@/components/markdown/MarkdownRenderer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,6 +46,23 @@ function MessageBubbleImpl({
   const [failedImageKeys, setFailedImageKeys] = useState<Record<string, boolean>>({});
   const [reloadSeed, setReloadSeed] = useState<Record<string, number>>({});
   const isUser = message.role === "user";
+
+  // 多版本导航
+  const totalVariants = message.variants?.length ?? 1;
+  const defaultVariantIdx = message.activeVariantIdx ?? totalVariants - 1;
+  const [variantIdx, setVariantIdx] = useState(defaultVariantIdx);
+
+  useEffect(() => {
+    const total = message.variants?.length ?? 1;
+    setVariantIdx(message.activeVariantIdx ?? total - 1);
+  }, [message.variants?.length, message.activeVariantIdx]);
+
+  // streaming 时始终展示 message.content（实时流），否则按版本读取
+  const activeVariant = (!isStreaming && !isUser && message.variants?.[variantIdx]) || null;
+  const displayContent = activeVariant?.content ?? message.content;
+  const displayThinkingRaw = activeVariant?.thinkingContent ?? message.thinkingContent;
+  const displayModelName = activeVariant?.modelName ?? message.modelName;
+
   const extractThinkFromContent = (raw: string) => {
     const regex = /<think>([\s\S]*?)<\/think>/gi;
     const thinks: string[] = [];
@@ -59,9 +76,41 @@ function MessageBubbleImpl({
       think: thinks.join("\n\n").trim(),
     };
   };
-  const parsed = isUser ? null : extractThinkFromContent(message.content);
-  const thinkContent = isUser ? "" : (message.thinkingContent?.trim() || parsed?.think || "");
-  const answerContent = isUser ? message.content : (parsed?.answer || "");
+  const parsed = isUser ? null : extractThinkFromContent(displayContent);
+  const thinkContent = isUser ? "" : (displayThinkingRaw?.trim() || parsed?.think || "");
+  const answerContent = isUser ? displayContent : (parsed?.answer || "");
+  const attachmentImageUrls =
+    message.attachments
+      ?.filter((item) => item.kind === "image" && item.status === "ready" && item.dataUrl)
+      .map((item) => item.dataUrl!) ?? [];
+  const userImageUrls = attachmentImageUrls.length ? attachmentImageUrls : (message.imageUrls ?? []);
+
+  const getAttachmentStatusLabel = (item: NonNullable<ChatMessage["attachments"]>[number]) => {
+    if (item.status === "error") return "读取失败";
+    if (item.status === "unsupported") return "仅文件名";
+    if (item.kind === "image") return "图片";
+    if (item.textTruncated) return "已截断";
+    return "内容已读取";
+  };
+
+  const renderAttachmentList = () => {
+    if (!message.attachments?.length) return null;
+    return (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {message.attachments.map((item) => (
+          <div
+            key={item.id}
+            className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/50 bg-muted/45 px-2 py-1 text-[11px] text-muted-foreground"
+            title={item.errorMessage}
+          >
+            <FileText className="h-3 w-3 shrink-0" />
+            <span className="max-w-[160px] truncate">{item.name}</span>
+            <span className="shrink-0 text-[10px] text-muted-foreground/80">{getAttachmentStatusLabel(item)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   useEffect(() => {
     setEditText(message.content);
@@ -160,17 +209,6 @@ function MessageBubbleImpl({
             >
               {message.senderAvatar?.trim() || "潇"}
             </span>
-            <div className="ml-1 flex items-center gap-0.5 opacity-0 transition group-hover/msg:opacity-100">
-              <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={doCopy} title="复制">
-                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-              </Button>
-              <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditText(message.content); setEditOpen(true); }} title="编辑">
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onDelete} title="删除">
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
           </div>
           <div
             className={cn(
@@ -182,11 +220,24 @@ function MessageBubbleImpl({
               content={message.content}
               className="prose-p:my-1.5 prose-p:leading-relaxed text-sm text-foreground"
             />
-            {message.imageUrls?.length ? (
+            {renderAttachmentList()}
+            {userImageUrls.length ? (
               <div className="mt-2 grid grid-cols-2 gap-2">
-                {message.imageUrls.map((url, idx) => renderImageCard(url, `u-${idx}-${url.slice(0, 24)}`, "max-h-48 w-full cursor-zoom-in object-cover"))}
+                {userImageUrls.map((url, idx) => renderImageCard(url, `u-${idx}-${url.slice(0, 24)}`, "max-h-48 w-full cursor-zoom-in object-cover"))}
               </div>
             ) : null}
+          </div>
+          {/* 用户消息底部操作栏 */}
+          <div className="flex items-center gap-0.5 opacity-0 transition group-hover/msg:opacity-100">
+            <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={doCopy} title="复制">
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            </Button>
+            <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditText(message.content); setEditOpen(true); }} title="编辑">
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onDelete} title="删除">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
       ) : (
@@ -201,41 +252,10 @@ function MessageBubbleImpl({
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
               <span className="font-medium text-foreground/90">{message.senderName ?? "Assistant"}</span>
-              {message.modelName ? (
+              {displayModelName ? (
                 <span className="rounded-md border border-border/50 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  {message.modelName}
+                  {displayModelName}
                 </span>
-              ) : null}
-              <div className="ml-auto flex items-center gap-0.5 opacity-0 transition group-hover/msg:opacity-100">
-                <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={doCopy} title="复制">
-                  {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                </Button>
-                {onRegenerate && isLastAssistant ? (
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onRegenerate} title="重新生成">
-                    <RefreshCw className="h-3.5 w-3.5" />
-                  </Button>
-                ) : null}
-                <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onDelete} title="删除">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-            {isStreaming && !message.content ? (
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <span className="inline-flex gap-0.5">
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: "0ms" }} />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: "150ms" }} />
-                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: "300ms" }} />
-                </span>
-                正在输入…
-              </div>
-            ) : null}
-            <div className={cn("text-foreground", thinkContent ? "mt-1" : "")}>
-              {answerContent ? (
-                <MarkdownRenderer
-                  content={answerContent}
-                  className="prose-headings:mb-2 prose-headings:mt-4 prose-p:my-2 prose-p:leading-7 first:prose-p:mt-0 prose-li:my-0.5 text-[0.9375rem] leading-7 text-foreground/95"
-                />
               ) : null}
             </div>
             {thinkContent ? (
@@ -257,6 +277,24 @@ function MessageBubbleImpl({
                 </div>
               </details>
             ) : null}
+            {isStreaming && !message.content && !thinkContent ? (
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <span className="inline-flex gap-0.5">
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: "0ms" }} />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: "150ms" }} />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: "300ms" }} />
+                </span>
+                正在输入…
+              </div>
+            ) : null}
+            <div className={cn("text-foreground", thinkContent ? "mt-1" : "")}>
+              {answerContent ? (
+                <MarkdownRenderer
+                  content={answerContent}
+                  className="prose-headings:mb-2 prose-headings:mt-4 prose-p:my-2 prose-p:leading-7 first:prose-p:mt-0 prose-li:my-0.5 text-[0.9375rem] leading-7 text-foreground/95"
+                />
+              ) : null}
+            </div>
             {message.imageUrls?.length ? (
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {message.imageUrls.map((url, idx) => renderImageCard(url, `a-u-${idx}-${url.slice(0, 24)}`, "max-h-48 w-full cursor-zoom-in object-cover"))}
@@ -267,6 +305,51 @@ function MessageBubbleImpl({
                 {message.generatedImageUrls.map((url, idx) => renderImageCard(url, `g-${idx}-${url.slice(0, 24)}`, "max-h-64 w-full cursor-zoom-in object-contain bg-black/5"))}
               </div>
             ) : null}
+
+            {/* 底部操作栏 */}
+            <div className="mt-2 flex items-center gap-0.5 opacity-0 transition group-hover/msg:opacity-100">
+              {totalVariants > 1 ? (
+                <>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => setVariantIdx((v) => Math.max(0, v - 1))}
+                    disabled={variantIdx === 0}
+                    title="上一个版本"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="min-w-[2.5rem] text-center text-[11px] text-muted-foreground tabular-nums">
+                    {variantIdx + 1} / {totalVariants}
+                  </span>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => setVariantIdx((v) => Math.min(totalVariants - 1, v + 1))}
+                    disabled={variantIdx === totalVariants - 1}
+                    title="下一个版本"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="mx-1 inline-block h-3 w-px bg-border/60" />
+                </>
+              ) : null}
+              <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={doCopy} title="复制">
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              </Button>
+              {onRegenerate && isLastAssistant ? (
+                <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onRegenerate} title="重新生成">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </Button>
+              ) : null}
+              <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onDelete} title="删除">
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         </div>
       )}

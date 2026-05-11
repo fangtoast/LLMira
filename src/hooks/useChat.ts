@@ -11,17 +11,18 @@
  */
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { buildApiMessagesFromChat } from "@/lib/chat/buildMessages";
-import { generateImage, streamChatCompletion } from "@/lib/api/client";
+import { DEFAULT_STREAM_TIMEOUT_MS, generateImage, streamChatCompletion } from "@/lib/api/client";
+import type { StreamAbortReason } from "@/lib/api/types";
 import { useChatStore } from "@/lib/store/chatStore";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 import { useConversations } from "./useConversations";
-import type { ChatMessage } from "@/types";
+import type { ChatAttachment, ChatMessage, ChatMessageVariant } from "@/types";
 
 function uid() {
   return crypto.randomUUID();
 }
 
-const STOP_TAG = "\n\n*（生成已停止）*";
+type SendPayload = { text: string; attachments?: ChatAttachment[] };
 
 function isAbortError(e: unknown): boolean {
   if (e && typeof e === "object" && "name" in e && (e as { name: string }).name === "AbortError") return true;
@@ -69,12 +70,15 @@ export function useChat() {
   const { createConversation, saveMessages } = useConversations();
 
   const streamAbortRef = useRef<AbortController | null>(null);
+  /** 用户点击停止与切换会话都会 `abort`，用此区分文案。 */
+  const streamUserAbortKindRef = useRef<"stop" | "conversation-switch" | null>(null);
   const sendLockRef = useRef(false);
   const prevConvId = useRef<string | null | undefined>(undefined);
-  const lastUserPayloadRef = useRef<{ text: string; imageDataUrls?: string[] } | null>(null);
+  const lastUserPayloadRef = useRef<SendPayload | null>(null);
 
   useEffect(() => {
     if (prevConvId.current !== undefined && prevConvId.current !== activeConversationId) {
+      streamUserAbortKindRef.current = "conversation-switch";
       streamAbortRef.current?.abort();
     }
     prevConvId.current = activeConversationId;
@@ -82,6 +86,22 @@ export function useChat() {
 
   const buildFriendlyError = (error: unknown) => {
     const message = error instanceof Error ? error.message : "未知错误";
+    const lower = message.toLowerCase();
+    if (
+      lower.includes("context_length") ||
+      lower.includes("context length") ||
+      (lower.includes("invalid_request_error") && lower.includes("context")) ||
+      (lower.includes("context") &&
+        (lower.includes("token") || lower.includes("limit") || lower.includes("exceed"))) ||
+      lower.includes("maximum context") ||
+      lower.includes("token limit") ||
+      lower.includes("too many tokens") ||
+      lower.includes("prompt is too long") ||
+      lower.includes("input is too long") ||
+      lower.includes("requested token count exceeds")
+    ) {
+      return "提示词或对话过长，超出模型上下文限制。请缩短输入、删除较早消息或新开会话后重试。";
+    }
     if (message.includes("503")) {
       return "服务暂时繁忙（503），请稍后重试，或切换其他模型后再发送。";
     }
@@ -100,6 +120,23 @@ export function useChat() {
     return `请求失败：${message}`;
   };
 
+  /** 合并已生成片段与中止说明；并消费 `streamUserAbortKindRef`。 */
+  function formatAbortedStreamAssistantContent(acc: string, reason: StreamAbortReason): string {
+    const kind = streamUserAbortKindRef.current;
+    streamUserAbortKindRef.current = null;
+
+    if (reason === "timeout") {
+      return acc ? `${acc}\n\n*（客户端等待超时，流式连接已结束）*` : "客户端等待超时，未收到完整回复。";
+    }
+    if (reason === "user") {
+      if (kind === "conversation-switch") {
+        return acc ? `${acc}\n\n*（已切换会话，生成中断）*` : "已切换会话，生成已中断。";
+      }
+      return acc ? `${acc}\n\n*（已手动停止生成）*` : "已停止生成。";
+    }
+    return acc ? `${acc}\n\n*（生成已停止）*` : "生成已停止。";
+  }
+
   const saveFinalMessages = useCallback(
     async (conversationId: string, messages: ChatMessage[]) => {
       await saveMessages(conversationId, messages);
@@ -108,6 +145,7 @@ export function useChat() {
   );
 
   const stopGeneration = useCallback(() => {
+    streamUserAbortKindRef.current = "stop";
     streamAbortRef.current?.abort();
   }, []);
 
@@ -117,15 +155,15 @@ export function useChat() {
       assistantId: string;
       userMessage: ChatMessage;
       content: string;
-      imageDataUrls: string[];
+      attachments: ChatAttachment[];
     }) => {
-      const { conversationId, assistantId, userMessage, content, imageDataUrls } = params;
+      const { conversationId, assistantId, userMessage, content, attachments } = params;
       let acc = "";
       let thinkingAcc = "";
       const history = (useChatStore.getState().messagesByConversation[conversationId] ?? []).filter(
         (m) => m.id !== userMessage.id && m.id !== assistantId,
       );
-      const apiMessages = buildApiMessagesFromChat(history, content, imageDataUrls);
+      const apiMessages = buildApiMessagesFromChat(history, content, attachments);
 
       const ac = new AbortController();
       streamAbortRef.current = ac;
@@ -155,20 +193,31 @@ export function useChat() {
           onDone: async (usage) => {
             setLastTokenUsage(usage);
             const list = useChatStore.getState().messagesByConversation[conversationId] ?? [];
-            const final = list.map((m) =>
-              m.id === assistantId
-                ? {
-                    ...m,
-                    content: acc,
-                    thinkingContent: thinkingAcc || undefined,
-                    tokenUsage: usage,
-                  }
-                : m,
-            );
+            const final = list.map((m) => {
+              if (m.id !== assistantId) return m;
+              const base = {
+                ...m,
+                content: acc,
+                thinkingContent: thinkingAcc || undefined,
+                tokenUsage: usage,
+              };
+              if (m.variants) {
+                const newVariant: ChatMessageVariant = {
+                  content: acc,
+                  thinkingContent: thinkingAcc || undefined,
+                  modelName: m.modelName,
+                  tokenUsage: usage,
+                  createdAt: m.createdAt,
+                };
+                const variants = [...m.variants, newVariant];
+                return { ...base, variants, activeVariantIdx: variants.length - 1 };
+              }
+              return base;
+            });
             await saveFinalMessages(conversationId, final);
           },
-          onAbort: async () => {
-            const text = acc ? `${acc}${STOP_TAG}` : "生成已停止。";
+          onAbort: async (reason) => {
+            const text = formatAbortedStreamAssistantContent(acc, reason);
             patchAssistantMessage(conversationId, assistantId, { content: text, thinkingContent: thinkingAcc || undefined });
             const patched = (useChatStore.getState().messagesByConversation[conversationId] ?? []).map((m) =>
               m.id === assistantId
@@ -178,7 +227,7 @@ export function useChat() {
             await saveFinalMessages(conversationId, patched);
           },
         },
-        { signal: ac.signal },
+        { signal: ac.signal, streamTimeoutMs: DEFAULT_STREAM_TIMEOUT_MS },
       );
     },
     [
@@ -217,7 +266,9 @@ export function useChat() {
         await saveFinalMessages(conversationId, list);
       } catch (error) {
         if (isAbortError(error)) {
-          const msg = "生成已停止。";
+          const kind = streamUserAbortKindRef.current;
+          streamUserAbortKindRef.current = null;
+          const msg = kind === "conversation-switch" ? "已切换会话，生成已中断。" : "已停止生成。";
           patchAssistantMessage(conversationId, assistantId, { content: msg });
           const list = useChatStore.getState().messagesByConversation[conversationId] ?? [];
           await saveFinalMessages(
@@ -233,9 +284,9 @@ export function useChat() {
   );
 
   const sendMessage = useCallback(
-    async (payload: { text: string; imageDataUrls?: string[] }) => {
+    async (payload: SendPayload) => {
       const content = payload.text;
-      const imageDataUrls = payload.imageDataUrls ?? [];
+      const attachments = payload.attachments ?? [];
       if (sendLockRef.current) return;
       if (loading) return;
       if (!apiKey) {
@@ -243,10 +294,10 @@ export function useChat() {
         return;
       }
       const trimmed = content.trim();
-      if (!trimmed && imageDataUrls.length === 0) return;
+      if (!trimmed && attachments.length === 0) return;
 
       setClientNotice(null);
-      lastUserPayloadRef.current = { text: content, imageDataUrls };
+      lastUserPayloadRef.current = { text: content, attachments };
 
       let conversationId = activeConversationId;
       if (!conversationId) {
@@ -260,9 +311,12 @@ export function useChat() {
         role: "user",
         senderName: userName,
         senderAvatar: userAvatarText,
-        content: trimmed || (imageDataUrls.length ? "[图片]" : ""),
+        content: trimmed || (attachments.length ? "[附件]" : ""),
         createdAt: userCreatedAt,
-        imageUrls: imageDataUrls,
+        attachments,
+        imageUrls: attachments
+          .filter((item) => item.kind === "image" && item.status === "ready" && item.dataUrl)
+          .map((item) => item.dataUrl!),
       };
       const assistantId = uid();
       const assistantCreatedAt = Math.max(Date.now(), userCreatedAt + 1);
@@ -293,7 +347,7 @@ export function useChat() {
             assistantId,
             userMessage,
             content: trimmed,
-            imageDataUrls,
+            attachments,
           });
         }
       } catch (error) {
@@ -332,7 +386,7 @@ export function useChat() {
     ],
   );
 
-  /** 重新生成：删除尾部助手消息，保留用户消息，按原类型再请求 */
+  /** 重新生成：原地更新末尾助手消息，保留旧版本快照到 variants */
   const regenerateFromLastUser = useCallback(async () => {
     const convId = activeConversationId;
     if (!convId || !apiKey) return;
@@ -342,19 +396,31 @@ export function useChat() {
     const last = list[list.length - 1];
     const prevUser = list[list.length - 2];
     if (last?.role !== "assistant" || prevUser?.role !== "user") return;
-    const assistantId = uid();
+    const assistantId = last.id;
     const useImageGen = Boolean(last?.generatedImageUrls?.length) || isImageModel(last?.modelName);
-    const assistantMessage: ChatMessage = {
-      id: assistantId,
-      role: "assistant",
-      senderName: "Assistant",
-      modelName: useImageGen ? last.modelName || activeImageModel : activeModel,
+
+    const existingVariants: ChatMessageVariant[] = last.variants ?? [
+      {
+        content: last.content,
+        thinkingContent: last.thinkingContent,
+        modelName: last.modelName,
+        tokenUsage: last.tokenUsage,
+        createdAt: last.createdAt,
+      },
+    ];
+
+    const updatedAssistant: ChatMessage = {
+      ...last,
       content: "",
+      thinkingContent: undefined,
+      modelName: useImageGen ? last.modelName || activeImageModel : activeModel,
       createdAt: Date.now(),
+      variants: existingVariants,
+      activeVariantIdx: existingVariants.length,
     };
     const withoutLast = list.slice(0, -1);
-    replaceMessages(convId, [...withoutLast, assistantMessage]);
-    await saveFinalMessages(convId, [...withoutLast, assistantMessage]);
+    replaceMessages(convId, [...withoutLast, updatedAssistant]);
+    await saveFinalMessages(convId, [...withoutLast, updatedAssistant]);
 
     setLoading(true);
     sendLockRef.current = true;
@@ -372,7 +438,7 @@ export function useChat() {
           assistantId,
           userMessage: prevUser,
           content: prevUser.content,
-          imageDataUrls: prevUser.imageUrls ?? [],
+          attachments: prevUser.attachments ?? [],
         });
       }
     } catch (error) {
@@ -444,7 +510,7 @@ export function useChat() {
             assistantId,
             userMessage: updatedUser,
             content: newContent,
-            imageDataUrls: updatedUser.imageUrls ?? [],
+            attachments: updatedUser.attachments ?? [],
           });
         }
       } catch (error) {

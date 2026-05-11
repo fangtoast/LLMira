@@ -11,6 +11,31 @@
 /** 消息发送方角色（协议层）。 */
 export type ChatRole = "system" | "user" | "assistant";
 
+/** 用户上传附件的解析结果；正文会随消息持久化到 IndexedDB。 */
+export interface ChatAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  kind: "image" | "text" | "pdf" | "unsupported";
+  status: "ready" | "unsupported" | "error";
+  dataUrl?: string;
+  textContent?: string;
+  textTruncated?: boolean;
+  errorMessage?: string;
+  storageKey?: string;
+  remoteUrl?: string;
+}
+
+/** 助手消息单次回答的快照（用于多版本历史浏览）。 */
+export interface ChatMessageVariant {
+  content: string;
+  thinkingContent?: string;
+  modelName?: string;
+  tokenUsage?: TokenUsage;
+  createdAt: number;
+}
+
 /** 单条聊天消息（含可选多模态与思考内容）。 */
 export interface ChatMessage {
   id: string;
@@ -22,8 +47,14 @@ export interface ChatMessage {
   thinkingContent?: string;
   createdAt: number;
   tokenUsage?: TokenUsage;
+  attachments?: ChatAttachment[];
+  /** @deprecated 旧版图片附件字段；新逻辑优先使用 `attachments`。 */
   imageUrls?: string[];
   generatedImageUrls?: string[];
+  /** 重新生成时保留的历史版本快照（按生成顺序，0-based）。 */
+  variants?: ChatMessageVariant[];
+  /** 持久化上次浏览的版本索引，默认展示最新版本。 */
+  activeVariantIdx?: number;
 }
 
 /** 会话元数据（标题与时间戳；模型记录在会话级）。 */
