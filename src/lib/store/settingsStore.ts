@@ -61,6 +61,7 @@ interface SettingsState {
   frequencyPenalty: number;
   sidebarCollapsed: boolean;
   apiKeyModalOpen: boolean;
+  hasCompletedOnboarding: boolean;
   setApiKey: (key: string) => void;
   setUserName: (name: string) => void;
   setUserAvatarText: (text: string) => void;
@@ -75,6 +76,7 @@ interface SettingsState {
   setFrequencyPenalty: (v: number) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setApiKeyModalOpen: (open: boolean) => void;
+  setHasCompletedOnboarding: (completed: boolean) => void;
 }
 
 /** 用户级设置（含密钥与模型选择），详见 `partialize` 持久化字段。 */
@@ -84,7 +86,7 @@ export const useSettingsStore = create<SettingsState>()(
       apiKey: "",
       userName: "Xiao",
       userAvatarText: "潇",
-      activeModel: "gpt-5-chat",
+      activeModel: "gpt-5.5",
       activeImageModel: "gpt-image-1",
       generationMode: "chat",
       enableThinking: false,
@@ -95,6 +97,7 @@ export const useSettingsStore = create<SettingsState>()(
       frequencyPenalty: 0,
       sidebarCollapsed: false,
       apiKeyModalOpen: false,
+      hasCompletedOnboarding: false,
       setApiKey: (apiKey) => set({ apiKey }),
       /** 允许空字符串，便于在输入框中删除后重新输入；界面展示处再用默认值兜底 */
       setUserName: (userName) => set({ userName }),
@@ -110,6 +113,7 @@ export const useSettingsStore = create<SettingsState>()(
       setFrequencyPenalty: (frequencyPenalty) => set({ frequencyPenalty }),
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
       setApiKeyModalOpen: (apiKeyModalOpen) => set({ apiKeyModalOpen }),
+      setHasCompletedOnboarding: (hasCompletedOnboarding) => set({ hasCompletedOnboarding }),
     }),
     {
       name: "huiyan-settings",
@@ -128,6 +132,7 @@ export const useSettingsStore = create<SettingsState>()(
         presencePenalty: state.presencePenalty,
         frequencyPenalty: state.frequencyPenalty,
         sidebarCollapsed: state.sidebarCollapsed,
+        hasCompletedOnboarding: state.hasCompletedOnboarding,
       }),
     },
   ),

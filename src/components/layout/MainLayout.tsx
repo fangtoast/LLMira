@@ -18,6 +18,7 @@ import { InputBar } from "@/components/chat/InputBar";
 import { TokenStats } from "@/components/chat/TokenStats";
 import { ArtifactsPanel } from "@/components/artifacts/ArtifactsPanel";
 import { ApiKeyModal } from "@/components/modals/ApiKeyModal";
+import { OnboardingModal } from "@/components/modals/OnboardingModal";
 import { Button } from "@/components/ui/button";
 import { useChat } from "@/hooks/useChat";
 import { useConversations } from "@/hooks/useConversations";
@@ -194,6 +195,7 @@ export function MainLayout() {
         />
       )}
       <ApiKeyModal />
+      <OnboardingModal />
     </div>
   );
 }

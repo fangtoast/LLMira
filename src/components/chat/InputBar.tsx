@@ -10,7 +10,7 @@
  * @description 字符上限来自 `NEXT_PUBLIC_INPUT_MAX_CHARS`。
  */
 import { useEffect, useRef, useState, type ClipboardEvent, type ClipboardEventHandler } from "react";
-import { ArrowUp, FileUp, Sparkles, Square, Wrench, X } from "lucide-react";
+import { ArrowUp, CheckCircle2, FileText, FileUp, Sparkles, Square, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -19,20 +19,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { parseAttachment } from "@/lib/files/parseAttachment";
 import { useSettingsStore } from "@/lib/store/settingsStore";
+import type { ChatAttachment } from "@/types";
 
 const INPUT_MAX =
   typeof process !== "undefined" && process.env.NEXT_PUBLIC_INPUT_MAX_CHARS
     ? Number.parseInt(process.env.NEXT_PUBLIC_INPUT_MAX_CHARS, 10) || 16000
     : 16000;
-
-interface AttachmentItem {
-  id: string;
-  name: string;
-  type: string;
-  size: number;
-  dataUrl?: string;
-}
 
 /** 底部输入条：聚合附件 data URL 后调用 `onSend`。 */
 export function InputBar({
@@ -40,18 +34,16 @@ export function InputBar({
   onStop,
   loading,
 }: {
-  onSend: (payload: { text: string; imageDataUrls?: string[] }) => Promise<void>;
+  onSend: (payload: { text: string; attachments?: ChatAttachment[] }) => Promise<void>;
   onStop: () => void;
   loading: boolean;
 }) {
   const { generationMode, setGenerationMode, enableThinking, setEnableThinking } = useSettingsStore();
   const [value, setValue] = useState("");
-  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const prevLoading = useRef(loading);
-
-  const imageDataUrls = attachments.filter((item) => item.type.startsWith("image/") && item.dataUrl).map((item) => item.dataUrl!);
 
   const resizeTextarea = () => {
     const el = textareaRef.current;
@@ -83,37 +75,18 @@ export function InputBar({
     const toSend = savedValue.slice(0, INPUT_MAX);
     setValue("");
     requestAnimationFrame(resizeTextarea);
-    const fileHint =
-      savedAttachments.length > 0
-        ? `\n\n[已附加文件: ${savedAttachments.map((item) => item.name).join(", ")}]`
-        : "";
     setAttachments([]);
     try {
-      const payload = { text: `${toSend.trim()}${fileHint}`.trim(), imageDataUrls };
+      const payload = {
+        text: toSend.trim(),
+        attachments: savedAttachments,
+      };
       await onSend(payload);
     } catch {
       setValue(savedValue);
       setAttachments(savedAttachments);
       requestAnimationFrame(resizeTextarea);
     }
-  };
-
-  const toAttachment = async (file: File): Promise<AttachmentItem> => {
-    const base: AttachmentItem = {
-      id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
-      name: file.name,
-      type: file.type || "application/octet-stream",
-      size: file.size,
-    };
-    if (!file.type.startsWith("image/")) return base;
-
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-    return { ...base, dataUrl };
   };
 
   const collectFilesFromEntry = async (entry: FileSystemEntry): Promise<File[]> =>
@@ -157,7 +130,7 @@ export function InputBar({
 
   const mergeAttachments = async (files: File[]) => {
     if (!files.length) return;
-    const parsed = await Promise.all(files.slice(0, 20).map((file) => toAttachment(file)));
+    const parsed = await Promise.all(files.slice(0, 20).map((file) => parseAttachment(file)));
     setAttachments((prev) => [...prev, ...parsed].slice(0, 20));
   };
 
@@ -231,13 +204,28 @@ export function InputBar({
                 key={item.id}
                 className="relative flex items-center gap-2 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-white/10 dark:text-zinc-200"
               >
-                {item.dataUrl ? (
+                {item.kind === "image" && item.dataUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={item.dataUrl} alt={item.name} className="h-6 w-6 rounded-full object-cover" />
+                ) : item.status === "ready" && item.textContent ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                 ) : (
-                  <FileUp className="h-3.5 w-3.5 text-slate-500 dark:text-zinc-400" />
+                  <FileText className="h-3.5 w-3.5 text-slate-500 dark:text-zinc-400" />
                 )}
                 <span className="max-w-[130px] truncate">{item.name}</span>
+                {item.status === "ready" && item.textContent ? (
+                  <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-300">
+                    {item.textTruncated ? "已截断" : "内容已读取"}
+                  </span>
+                ) : item.status === "error" ? (
+                  <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-300">
+                    读取失败
+                  </span>
+                ) : item.status === "unsupported" ? (
+                  <span className="rounded-full bg-slate-500/10 px-1.5 py-0.5 text-[10px] text-slate-500 dark:text-zinc-400">
+                    仅文件名
+                  </span>
+                ) : null}
                 <button
                   type="button"
                   className="rounded-full bg-black/40 p-0.5 text-white"
