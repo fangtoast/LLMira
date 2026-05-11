@@ -37,18 +37,23 @@ export interface ModelsResponse {
   data: ModelInfo[];
 }
 
+/** `streamChatCompletion` 触发 `onAbort` 时的 coarse 分类（用户主动 / 超时 / 其它）。 */
+export type StreamAbortReason = "timeout" | "user" | "unknown";
+
 /** 流式解析过程中的回调集合。 */
 export interface StreamCallbacks {
   onStart?: () => void;
   onToken?: (token: string) => void;
   onReasoningToken?: (token: string) => void;
   onDone?: (usage?: TokenUsage) => void | Promise<void>;
-  /** 流被 AbortController 中止（含 fetch/read 抛出的 AbortError） */
-  onAbort?: () => void | Promise<void>;
+  /** 流被中止：`user` 为用户 signal；`timeout` 为整次流式等待超时；其余为 `unknown`。 */
+  onAbort?: (reason: StreamAbortReason) => void | Promise<void>;
 }
 
 export type StreamRequestOptions = {
   signal?: AbortSignal;
+  /** 流式整次请求最长等待（含首包与各 token），默认 30 分钟。 */
+  streamTimeoutMs?: number;
 };
 
 /** POST `/v1/images/generations` 请求体。 */

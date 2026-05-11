@@ -11,15 +11,21 @@
 import { logger } from "@/lib/logger";
 import type { TokenUsage } from "@/types";
 import { extractModelIdsFromResponse } from "./parseModelsResponse";
-import type { ChatCompletionRequest, ImageGenerationRequest, StreamCallbacks, StreamRequestOptions } from "./types";
+import type {
+  ChatCompletionRequest,
+  ImageGenerationRequest,
+  StreamAbortReason,
+  StreamCallbacks,
+  StreamRequestOptions,
+} from "./types";
 import { MissingApiKeyError } from "./types";
 
 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
 
-async function readErrorText(response: Response) {
+async function readErrorText(response: Response, maxLen = 500) {
   try {
     const text = await response.text();
-    return text.slice(0, 200);
+    return text.slice(0, maxLen);
   } catch {
     return "";
   }
@@ -97,30 +103,74 @@ function isAbortError(e: unknown): boolean {
   return false;
 }
 
-function withRequestTimeout(signal?: AbortSignal, timeoutMs = 30000): AbortSignal {
+/** 对话流式请求的默认总时长上限（避免旧版 30s 误杀长推理）。 */
+export const DEFAULT_STREAM_TIMEOUT_MS = 30 * 60 * 1000;
+
+const DEFAULT_SHORT_REQUEST_TIMEOUT_MS = 30_000;
+
+type TimeoutSignalBundle = {
+  requestSignal: AbortSignal;
+  /** 是否为「仅超时」中止（用户 signal 未 abort）。 */
+  isTimeoutAbort: () => boolean;
+};
+
+/**
+ * 合并用户 AbortSignal 与_wall clock_ 超时，供 fetch / 流读取使用。
+ * @remarks 现代环境用 `AbortSignal.any` + `AbortSignal.timeout`；否则回退为 timer + 标记。
+ */
+function createRequestSignalWithTimeout(userSignal: AbortSignal | undefined, timeoutMs: number): TimeoutSignalBundle {
   const AS = AbortSignal as typeof AbortSignal & {
     timeout?: (ms: number) => AbortSignal;
     any?: (signals: AbortSignal[]) => AbortSignal;
   };
-  if (AS.timeout && AS.any && signal) return AS.any([signal, AS.timeout(timeoutMs)]);
-  if (AS.timeout && !signal) return AS.timeout(timeoutMs);
+
+  if (AS.timeout && AS.any) {
+    const timeoutSig = AS.timeout(timeoutMs);
+    const requestSignal = userSignal ? AS.any([userSignal, timeoutSig]) : timeoutSig;
+    return {
+      requestSignal,
+      isTimeoutAbort: () => timeoutSig.aborted && (!userSignal || !userSignal.aborted),
+    };
+  }
 
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), timeoutMs);
-  const onAbort = () => ac.abort();
-  if (signal) {
-    if (signal.aborted) ac.abort();
-    else signal.addEventListener("abort", onAbort, { once: true });
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    ac.abort();
+  }, timeoutMs);
+  const onUserAbort = () => {
+    ac.abort();
+  };
+  if (userSignal) {
+    if (userSignal.aborted) {
+      clearTimeout(timer);
+      ac.abort();
+    } else {
+      userSignal.addEventListener("abort", onUserAbort, { once: true });
+    }
   }
   ac.signal.addEventListener(
     "abort",
     () => {
       clearTimeout(timer);
-      if (signal) signal.removeEventListener("abort", onAbort);
+      if (userSignal) userSignal.removeEventListener("abort", onUserAbort);
     },
     { once: true },
   );
-  return ac.signal;
+  return {
+    requestSignal: ac.signal,
+    isTimeoutAbort: () => timedOut && (!userSignal || !userSignal.aborted),
+  };
+}
+
+function resolveStreamAbortReason(
+  userSignal: AbortSignal | undefined,
+  isTimeoutAbort: () => boolean,
+): StreamAbortReason {
+  if (userSignal?.aborted) return "user";
+  if (isTimeoutAbort()) return "timeout";
+  return "unknown";
 }
 
 /**
@@ -135,9 +185,10 @@ export async function streamChatCompletion(
   options?: StreamRequestOptions,
 ) {
   const signal = options?.signal;
-  const requestSignal = withRequestTimeout(signal);
+  const streamTimeoutMs = options?.streamTimeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS;
+  const { requestSignal, isTimeoutAbort } = createRequestSignalWithTimeout(signal, streamTimeoutMs);
   const startedAt = performance.now();
-  logger.info({ model: payload.model }, "[Request Model]");
+  logger.info({ model: payload.model, streamTimeoutMs }, "[Request Model]");
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
   try {
@@ -167,7 +218,7 @@ export async function streamChatCompletion(
         } catch {
           /* ignore */
         }
-        await callbacks.onAbort?.();
+        await callbacks.onAbort?.("user");
         return;
       }
       const { done, value } = await reader.read();
@@ -218,7 +269,8 @@ export async function streamChatCompletion(
           /* ignore */
         }
       }
-      await callbacks.onAbort?.();
+      const reason = resolveStreamAbortReason(signal, isTimeoutAbort);
+      await callbacks.onAbort?.(reason);
       return;
     }
     throw e;
@@ -234,7 +286,7 @@ export async function generateImage(
   options?: StreamRequestOptions,
 ): Promise<string[]> {
   const startedAt = performance.now();
-  const requestSignal = withRequestTimeout(options?.signal);
+  const { requestSignal } = createRequestSignalWithTimeout(options?.signal, DEFAULT_SHORT_REQUEST_TIMEOUT_MS);
   logger.info({ model: payload.model }, "[Request Model]");
   const response = await fetch(`${baseUrl}/v1/images/generations`, {
     method: "POST",
