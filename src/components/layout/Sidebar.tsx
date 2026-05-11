@@ -19,6 +19,7 @@ import {
   parseImportedFullBackupJson,
 } from "@/lib/chat/exportImport";
 import { useConversations } from "@/hooks/useConversations";
+import { useModels } from "@/hooks/useModels";
 import { useChatStore } from "@/lib/store/chatStore";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 import { Button } from "@/components/ui/button";
@@ -58,7 +59,9 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
     setFrequencyPenalty,
     setUserName,
     setUserAvatarText,
+    applyCurrentSettingsToAllModels,
   } = useSettingsStore();
+  const models = useModels();
   const {
     conversations,
     createConversation,
@@ -398,7 +401,6 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                   type="number"
                   step="1"
                   min="1"
-                  max="32768"
                   value={maxTokens}
                   onChange={(e) => setMaxTokens(Number(e.target.value))}
                   className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
@@ -428,6 +430,18 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                   className="w-20 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
                 />
               </label>
+              <div className="rounded-md border border-border/60 bg-background/60 p-2 text-[11px] text-muted-foreground dark:border-zinc-700 dark:bg-zinc-800/50">
+                当前模型：{activeModel}
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={() => applyCurrentSettingsToAllModels(models)}
+              >
+                将当前参数应用到全部模型
+              </Button>
             </div>
           </div>
         ) : null}

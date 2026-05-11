@@ -46,13 +46,9 @@ export function useChat() {
     activeImageModel,
     generationMode,
     enableThinking,
+    modelSettingsById,
     userName,
     userAvatarText,
-    temperature,
-    topP,
-    maxTokens,
-    presencePenalty,
-    frequencyPenalty,
     setApiKeyModalOpen,
   } = useSettingsStore();
   const {
@@ -68,6 +64,17 @@ export function useChat() {
     setClientNotice,
   } = useChatStore();
   const { createConversation, saveMessages } = useConversations();
+  const currentModelSettings = useMemo(() => {
+    return (
+      modelSettingsById[activeModel] ?? {
+        temperature: 0.7,
+        topP: 1,
+        maxTokens: 4096,
+        presencePenalty: 0,
+        frequencyPenalty: 0,
+      }
+    );
+  }, [activeModel, modelSettingsById]);
 
   const streamAbortRef = useRef<AbortController | null>(null);
   /** 用户点击停止与切换会话都会 `abort`，用此区分文案。 */
@@ -156,13 +163,16 @@ export function useChat() {
       userMessage: ChatMessage;
       content: string;
       attachments: ChatAttachment[];
+      historyMessages?: ChatMessage[];
     }) => {
-      const { conversationId, assistantId, userMessage, content, attachments } = params;
+      const { conversationId, assistantId, userMessage, content, attachments, historyMessages } = params;
       let acc = "";
       let thinkingAcc = "";
-      const history = (useChatStore.getState().messagesByConversation[conversationId] ?? []).filter(
-        (m) => m.id !== userMessage.id && m.id !== assistantId,
-      );
+      const history =
+        historyMessages ??
+        (useChatStore.getState().messagesByConversation[conversationId] ?? []).filter(
+          (m) => m.id !== userMessage.id && m.id !== assistantId,
+        );
       const apiMessages = buildApiMessagesFromChat(history, content, attachments);
 
       const ac = new AbortController();
@@ -173,11 +183,11 @@ export function useChat() {
         {
           model: activeModel,
           reasoning_effort: enableThinking ? "high" : undefined,
-          temperature,
-          top_p: topP,
-          max_tokens: maxTokens,
-          presence_penalty: presencePenalty,
-          frequency_penalty: frequencyPenalty,
+          temperature: currentModelSettings.temperature,
+          top_p: currentModelSettings.topP,
+          max_tokens: currentModelSettings.maxTokens,
+          presence_penalty: currentModelSettings.presencePenalty,
+          frequency_penalty: currentModelSettings.frequencyPenalty,
           messages: apiMessages,
         },
         {
@@ -233,15 +243,11 @@ export function useChat() {
     [
       activeModel,
       apiKey,
+      currentModelSettings,
       enableThinking,
-      frequencyPenalty,
-      maxTokens,
       patchAssistantMessage,
-      presencePenalty,
       saveFinalMessages,
       setLastTokenUsage,
-      temperature,
-      topP,
     ],
   );
 
@@ -387,89 +393,136 @@ export function useChat() {
   );
 
   /** 重新生成：原地更新末尾助手消息，保留旧版本快照到 variants */
+  const regenerateAssistantMessage = useCallback(
+    async (assistantMessageId: string) => {
+      const convId = activeConversationId;
+      if (!convId || !apiKey) return;
+      if (sendLockRef.current || loading) return;
+
+      const list = messagesByConversation[convId] ?? [];
+      const assistantIdx = list.findIndex((m) => m.id === assistantMessageId);
+      if (assistantIdx < 0) return;
+      const targetAssistant = list[assistantIdx];
+      if (!targetAssistant || targetAssistant.role !== "assistant") return;
+
+      let userIdx = -1;
+      for (let i = assistantIdx - 1; i >= 0; i -= 1) {
+        if (list[i]?.role === "user") {
+          userIdx = i;
+          break;
+        }
+      }
+      if (userIdx < 0) return;
+      const targetUser = list[userIdx]!;
+      const historyMessages = list.slice(0, userIdx);
+      const useImageGen = Boolean(targetAssistant.generatedImageUrls?.length) || isImageModel(targetAssistant.modelName);
+
+      const existingVariants: ChatMessageVariant[] = targetAssistant.variants ?? [
+        {
+          content: targetAssistant.content,
+          thinkingContent: targetAssistant.thinkingContent,
+          modelName: targetAssistant.modelName,
+          tokenUsage: targetAssistant.tokenUsage,
+          createdAt: targetAssistant.createdAt,
+        },
+      ];
+
+      const updatedAssistant: ChatMessage = {
+        ...targetAssistant,
+        content: "",
+        thinkingContent: undefined,
+        modelName: useImageGen ? targetAssistant.modelName || activeImageModel : activeModel,
+        createdAt: Date.now(),
+        variants: existingVariants,
+        activeVariantIdx: existingVariants.length,
+      };
+
+      const nextMessages = list.map((m, idx) => (idx === assistantIdx ? updatedAssistant : m));
+      replaceMessages(convId, nextMessages);
+      await saveFinalMessages(convId, nextMessages);
+
+      setLoading(true);
+      sendLockRef.current = true;
+      try {
+        if (useImageGen) {
+          await runImageForAssistant({
+            conversationId: convId,
+            assistantId: assistantMessageId,
+            prompt: targetUser.content,
+            imageModel: targetAssistant.modelName || activeImageModel,
+          });
+        } else {
+          await runStreamForAssistant({
+            conversationId: convId,
+            assistantId: assistantMessageId,
+            userMessage: targetUser,
+            content: targetUser.content,
+            attachments: targetUser.attachments ?? [],
+            historyMessages,
+          });
+        }
+      } catch (error) {
+        if (!isAbortError(error)) {
+          const fallback = buildFriendlyError(error);
+          patchAssistantMessage(convId, assistantMessageId, { content: fallback });
+          const l = useChatStore.getState().messagesByConversation[convId] ?? [];
+          await saveFinalMessages(
+            convId,
+            l.map((m) => (m.id === assistantMessageId ? { ...m, content: fallback } : m)),
+          );
+        }
+      } finally {
+        sendLockRef.current = false;
+        setLoading(false);
+        streamAbortRef.current = null;
+      }
+    },
+    [
+      activeConversationId,
+      activeImageModel,
+      activeModel,
+      apiKey,
+      loading,
+      messagesByConversation,
+      patchAssistantMessage,
+      replaceMessages,
+      runImageForAssistant,
+      runStreamForAssistant,
+      saveFinalMessages,
+      setLoading,
+    ],
+  );
+
   const regenerateFromLastUser = useCallback(async () => {
     const convId = activeConversationId;
     if (!convId || !apiKey) return;
-    if (sendLockRef.current || loading) return;
     const list = messagesByConversation[convId] ?? [];
-    if (list.length < 2) return;
-    const last = list[list.length - 1];
-    const prevUser = list[list.length - 2];
-    if (last?.role !== "assistant" || prevUser?.role !== "user") return;
-    const assistantId = last.id;
-    const useImageGen = Boolean(last?.generatedImageUrls?.length) || isImageModel(last?.modelName);
+    const lastAssistant = [...list].reverse().find((m) => m.role === "assistant");
+    if (!lastAssistant) return;
+    await regenerateAssistantMessage(lastAssistant.id);
+  }, [activeConversationId, apiKey, messagesByConversation, regenerateAssistantMessage]);
 
-    const existingVariants: ChatMessageVariant[] = last.variants ?? [
-      {
-        content: last.content,
-        thinkingContent: last.thinkingContent,
-        modelName: last.modelName,
-        tokenUsage: last.tokenUsage,
-        createdAt: last.createdAt,
-      },
-    ];
-
-    const updatedAssistant: ChatMessage = {
-      ...last,
-      content: "",
-      thinkingContent: undefined,
-      modelName: useImageGen ? last.modelName || activeImageModel : activeModel,
-      createdAt: Date.now(),
-      variants: existingVariants,
-      activeVariantIdx: existingVariants.length,
-    };
-    const withoutLast = list.slice(0, -1);
-    replaceMessages(convId, [...withoutLast, updatedAssistant]);
-    await saveFinalMessages(convId, [...withoutLast, updatedAssistant]);
-
-    setLoading(true);
-    sendLockRef.current = true;
-    try {
-      if (useImageGen) {
-        await runImageForAssistant({
-          conversationId: convId,
-          assistantId,
-          prompt: prevUser.content,
-          imageModel: last.modelName || activeImageModel,
-        });
-      } else {
-        await runStreamForAssistant({
-          conversationId: convId,
-          assistantId,
-          userMessage: prevUser,
-          content: prevUser.content,
-          attachments: prevUser.attachments ?? [],
-        });
-      }
-    } catch (error) {
-      if (!isAbortError(error)) {
-        const fallback = buildFriendlyError(error);
-        patchAssistantMessage(convId, assistantId, { content: fallback });
-        const l = useChatStore.getState().messagesByConversation[convId] ?? [];
-        await saveFinalMessages(
-          convId,
-          l.map((m) => (m.id === assistantId ? { ...m, content: fallback } : m)),
-        );
-      }
-    } finally {
-      sendLockRef.current = false;
-      setLoading(false);
-      streamAbortRef.current = null;
-    }
-  }, [
-    activeConversationId,
-    activeImageModel,
-    activeModel,
-    apiKey,
-    loading,
-    messagesByConversation,
-    patchAssistantMessage,
-    replaceMessages,
-    runImageForAssistant,
-    runStreamForAssistant,
-    saveFinalMessages,
-    setLoading,
-  ]);
+  const setAssistantActiveVariant = useCallback(
+    async (assistantMessageId: string, variantIdx: number) => {
+      const convId = activeConversationId;
+      if (!convId) return;
+      const list = messagesByConversation[convId] ?? [];
+      const target = list.find((m) => m.id === assistantMessageId);
+      if (!target || target.role !== "assistant" || !target.variants?.length) return;
+      const boundedIdx = Math.max(0, Math.min(target.variants.length - 1, variantIdx));
+      const next = list.map((m) =>
+        m.id === assistantMessageId
+          ? {
+              ...m,
+              activeVariantIdx: boundedIdx,
+            }
+          : m,
+      );
+      replaceMessages(convId, next);
+      await saveFinalMessages(convId, next);
+    },
+    [activeConversationId, messagesByConversation, replaceMessages, saveFinalMessages],
+  );
 
   const editUserMessageAndResend = useCallback(
     async (messageId: string, newContent: string) => {
@@ -573,7 +626,9 @@ export function useChat() {
       loading,
       stopGeneration,
       regenerateFromLastUser,
+      regenerateAssistantMessage,
       editUserMessageAndResend,
+      setAssistantActiveVariant,
       removeMessage,
       retryLast,
       clearClientNotice,
@@ -582,10 +637,12 @@ export function useChat() {
       clearClientNotice,
       editUserMessageAndResend,
       loading,
+      regenerateAssistantMessage,
       regenerateFromLastUser,
       removeMessage,
       retryLast,
       sendMessage,
+      setAssistantActiveVariant,
       stopGeneration,
     ],
   );

@@ -18,10 +18,11 @@ export interface ChatAttachment {
   type: string;
   size: number;
   kind: "image" | "text" | "pdf" | "unsupported";
-  status: "ready" | "unsupported" | "error";
+  status: "reading" | "ready" | "unsupported" | "error";
   dataUrl?: string;
   textContent?: string;
   textTruncated?: boolean;
+  textCharCount?: number;
   errorMessage?: string;
   storageKey?: string;
   remoteUrl?: string;

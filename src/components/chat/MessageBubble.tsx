@@ -21,22 +21,22 @@ import { BRAND_ICON_PATH, BRAND_NAME } from "@/lib/brand";
 
 type Props = {
   message: ChatMessage;
-  isLastAssistant: boolean;
   isStreaming: boolean;
   onCopy: () => void;
   onEditSave: (text: string) => void;
   onDelete: () => void;
   onRegenerate?: () => void;
+  onVariantChange?: (variantIdx: number) => void;
 };
 
 function MessageBubbleImpl({
   message,
-  isLastAssistant,
   isStreaming,
   onCopy,
   onEditSave,
   onDelete,
   onRegenerate,
+  onVariantChange,
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [copiedImageKey, setCopiedImageKey] = useState<string | null>(null);
@@ -86,6 +86,7 @@ function MessageBubbleImpl({
   const userImageUrls = attachmentImageUrls.length ? attachmentImageUrls : (message.imageUrls ?? []);
 
   const getAttachmentStatusLabel = (item: NonNullable<ChatMessage["attachments"]>[number]) => {
+    if (item.status === "reading") return "读取中";
     if (item.status === "error") return "读取失败";
     if (item.status === "unsupported") return "仅文件名";
     if (item.kind === "image") return "图片";
@@ -315,7 +316,13 @@ function MessageBubbleImpl({
                     size="icon"
                     variant="ghost"
                     className="h-7 w-7"
-                    onClick={() => setVariantIdx((v) => Math.max(0, v - 1))}
+                    onClick={() =>
+                      setVariantIdx((v) => {
+                        const next = Math.max(0, v - 1);
+                        onVariantChange?.(next);
+                        return next;
+                      })
+                    }
                     disabled={variantIdx === 0}
                     title="上一个版本"
                   >
@@ -329,7 +336,13 @@ function MessageBubbleImpl({
                     size="icon"
                     variant="ghost"
                     className="h-7 w-7"
-                    onClick={() => setVariantIdx((v) => Math.min(totalVariants - 1, v + 1))}
+                    onClick={() =>
+                      setVariantIdx((v) => {
+                        const next = Math.min(totalVariants - 1, v + 1);
+                        onVariantChange?.(next);
+                        return next;
+                      })
+                    }
                     disabled={variantIdx === totalVariants - 1}
                     title="下一个版本"
                   >
@@ -341,7 +354,7 @@ function MessageBubbleImpl({
               <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={doCopy} title="复制">
                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               </Button>
-              {onRegenerate && isLastAssistant ? (
+              {onRegenerate ? (
                 <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onRegenerate} title="重新生成">
                   <RefreshCw className="h-3.5 w-3.5" />
                 </Button>
@@ -398,6 +411,5 @@ export const MessageBubble = memo(
   MessageBubbleImpl,
   (prev, next) =>
     prev.message === next.message &&
-    prev.isLastAssistant === next.isLastAssistant &&
     prev.isStreaming === next.isStreaming,
 );

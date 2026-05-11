@@ -10,7 +10,7 @@
  * @description 字符上限来自 `NEXT_PUBLIC_INPUT_MAX_CHARS`。
  */
 import { useEffect, useRef, useState, type ClipboardEvent, type ClipboardEventHandler } from "react";
-import { ArrowUp, CheckCircle2, FileText, FileUp, Sparkles, Square, Wrench, X } from "lucide-react";
+import { ArrowUp, CheckCircle2, FileText, FileUp, Loader2, Sparkles, Square, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -27,6 +27,28 @@ const INPUT_MAX =
   typeof process !== "undefined" && process.env.NEXT_PUBLIC_INPUT_MAX_CHARS
     ? Number.parseInt(process.env.NEXT_PUBLIC_INPUT_MAX_CHARS, 10) || 16000
     : 16000;
+
+function getFileExtension(name: string) {
+  return name.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function inferAttachmentKind(file: File): ChatAttachment["kind"] {
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type === "application/pdf" || getFileExtension(file.name) === "pdf") return "pdf";
+  if (file.type.startsWith("text/") || file.type === "application/json") return "text";
+  return "unsupported";
+}
+
+function createReadingAttachment(file: File): ChatAttachment {
+  return {
+    id: `reading-${crypto.randomUUID()}`,
+    name: file.name,
+    type: file.type || "application/octet-stream",
+    size: file.size,
+    kind: inferAttachmentKind(file),
+    status: "reading",
+  };
+}
 
 /** 底部输入条：聚合附件 data URL 后调用 `onSend`。 */
 export function InputBar({
@@ -66,8 +88,11 @@ export function InputBar({
     resizeTextarea();
   }, [value]);
 
+  const hasReadingAttachments = attachments.some((item) => item.status === "reading");
+
   const submit = async () => {
     if (loading) return;
+    if (hasReadingAttachments) return;
     const text = value.trim();
     if (!text && attachments.length === 0) return;
     const savedValue = value;
@@ -130,8 +155,19 @@ export function InputBar({
 
   const mergeAttachments = async (files: File[]) => {
     if (!files.length) return;
-    const parsed = await Promise.all(files.slice(0, 20).map((file) => parseAttachment(file)));
-    setAttachments((prev) => [...prev, ...parsed].slice(0, 20));
+    const remainingSlots = Math.max(0, 20 - attachments.length);
+    if (remainingSlots <= 0) return;
+    const selectedFiles = files.slice(0, remainingSlots);
+    const readingAttachments = selectedFiles.map(createReadingAttachment);
+    const readingIdByIndex = readingAttachments.map((item) => item.id);
+    setAttachments((prev) => [...prev, ...readingAttachments].slice(0, 20));
+    const parsed = await Promise.all(selectedFiles.map((file) => parseAttachment(file)));
+    const parsedByReadingId = new Map(readingIdByIndex.map((id, idx) => [id, parsed[idx]!]));
+    setAttachments((prev) =>
+      prev
+        .map((item) => parsedByReadingId.get(item.id) ?? item)
+        .slice(0, 20),
+    );
   };
 
   const handleUpload = async (files: FileList | null) => {
@@ -207,6 +243,8 @@ export function InputBar({
                 {item.kind === "image" && item.dataUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={item.dataUrl} alt={item.name} className="h-6 w-6 rounded-full object-cover" />
+                ) : item.status === "reading" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-500 dark:text-zinc-400" />
                 ) : item.status === "ready" && item.textContent ? (
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                 ) : (
@@ -216,6 +254,10 @@ export function InputBar({
                 {item.status === "ready" && item.textContent ? (
                   <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-300">
                     {item.textTruncated ? "已截断" : "内容已读取"}
+                  </span>
+                ) : item.status === "reading" ? (
+                  <span className="rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-600 dark:text-sky-300">
+                    读取中
                   </span>
                 ) : item.status === "error" ? (
                   <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-300">
@@ -269,6 +311,7 @@ export function InputBar({
             <Button
               onClick={() => void submit()}
               size="icon"
+              disabled={hasReadingAttachments}
               className="h-9 w-9 shrink-0 rounded-full bg-slate-200 text-slate-600 transition-all duration-200 hover:scale-105 hover:bg-primary hover:text-primary-foreground dark:bg-white/10 dark:text-zinc-300"
             >
               <ArrowUp className="h-4 w-4" />
@@ -279,6 +322,7 @@ export function InputBar({
           <span>
             {value.length}/{INPUT_MAX}
           </span>
+          {hasReadingAttachments ? <span>附件读取中，完成后可发送</span> : null}
         </div>
         <div className="mt-2 flex flex-col gap-2 px-1 text-sm text-slate-600 dark:text-zinc-400 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">

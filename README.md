@@ -13,6 +13,7 @@
 
 ## 文档与规范
 
+- 变更摘要：[CHANGELOG.md](CHANGELOG.md)
 - 模块文档索引：[docs/README.md](docs/README.md)
 - 架构总览：[docs/engineering/architecture.md](docs/engineering/architecture.md)
 - 工程规范（Git、日志、注释）：[docs/engineering/CONTRIBUTING.md](docs/engineering/CONTRIBUTING.md)
@@ -49,7 +50,8 @@ docs/
 ### 输入与附件
 
 - 支持 **拖入**、**选择文件**、在输入框内 **粘贴** 图片或文件
-- 多模态：图片随对话以 `image_url` 提交；非图片在发送文案中附带文件名提示
+- 多模态：图片随对话以 `image_url` 提交；PDF / 文本等会在本地 **解析全文**（PDF 不再按固定字符数在解析阶段截断），构造请求时按块注入正文以适配模型上下文预算
+- 附件 **解析中** 状态与发送保护：解析未完成时不可发送，避免漏读
 - 可选环境变量 **输入长度上限**：`NEXT_PUBLIC_INPUT_MAX_CHARS`（默认 16000）
 - Enter 发送 / Shift+Enter 换行；发送结束后输入框自动聚焦
 
@@ -65,6 +67,7 @@ docs/
 ### 其他
 
 - 模型列表通过 `GET /v1/models` 拉取；可用 `NEXT_PUBLIC_MODEL_PRESET` 补充固定模型 id
+- **生成参数按模型存档**（temperature、top‑p、max tokens 等）：切换模型载入对应默认值；侧边栏可 **将当前参数应用到全部模型**
 - 响应式布局：视口与安全区（含底部输入区）适配移动浏览器
 
 ## API 文档参考

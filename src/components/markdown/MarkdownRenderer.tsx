@@ -12,7 +12,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
 import { CodeBlock } from "./CodeBlock";
 import { cn } from "@/lib/utils";
 
@@ -21,8 +20,29 @@ interface Props {
   className?: string;
 }
 
+function normalizeMathDelimiters(raw: string): string {
+  if (!raw.includes("\\")) return raw;
+  const fencedParts = raw.split(/(```[\s\S]*?```)/g);
+  return fencedParts
+    .map((part) => {
+      if (part.startsWith("```")) return part;
+      const withBlockMath = part.replace(/\\\[([\s\S]*?)\\\]/g, (_, expr: string) => {
+        const value = expr.trim();
+        if (!value) return _;
+        return `\n$$\n${value}\n$$\n`;
+      });
+      return withBlockMath.replace(/\\\(([\s\S]*?)\\\)/g, (_, expr: string) => {
+        const value = expr.trim();
+        if (!value) return _;
+        return `$${value}$`;
+      });
+    })
+    .join("");
+}
+
 /** 助手正文渲染入口。 */
 export function MarkdownRenderer({ content, className }: Props) {
+  const normalized = normalizeMathDelimiters(content);
   const safeUrlTransform = (url: string) => {
     const value = url.trim();
     if (/^data:image\//i.test(value)) return value;
@@ -52,7 +72,7 @@ export function MarkdownRenderer({ content, className }: Props) {
           },
         }}
       >
-        {content}
+        {normalized}
       </ReactMarkdown>
     </div>
   );

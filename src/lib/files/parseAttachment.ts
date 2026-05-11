@@ -10,6 +10,8 @@
 import type { ChatAttachment } from "@/types";
 
 const TEXT_MAX_CHARS = 50000;
+const PDF_MAX_CHARS = Number.POSITIVE_INFINITY;
+const PDFJS_WORKER_CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.mjs";
 const TEXT_FILE_EXTENSIONS = new Set(["txt", "md", "csv", "json"]);
 
 function uid() {
@@ -42,6 +44,22 @@ function truncateText(text: string) {
   return {
     textContent: text.slice(0, TEXT_MAX_CHARS),
     textTruncated: text.length > TEXT_MAX_CHARS,
+    textCharCount: text.length,
+  };
+}
+
+function truncateByLimit(text: string, maxChars: number) {
+  if (!Number.isFinite(maxChars)) {
+    return {
+      textContent: text,
+      textTruncated: false,
+      textCharCount: text.length,
+    };
+  }
+  return {
+    textContent: text.slice(0, maxChars),
+    textTruncated: text.length > maxChars,
+    textCharCount: text.length,
   };
 }
 
@@ -65,12 +83,10 @@ function readFileAsDataUrl(file: File): Promise<string> {
 
 async function parsePdfText(file: File) {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
-    import.meta.url,
-  ).toString();
   const data = new Uint8Array(await file.arrayBuffer());
-  const documentTask = pdfjs.getDocument({ data });
+  pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_CDN;
+  const loadingParams = { data } as Parameters<typeof pdfjs.getDocument>[0];
+  const documentTask = pdfjs.getDocument(loadingParams);
   const document = await documentTask.promise;
   const pages: string[] = [];
 
@@ -107,7 +123,7 @@ export async function parseAttachment(file: File): Promise<ChatAttachment> {
 
     if (isPdfFile(file)) {
       const text = await parsePdfText(file);
-      const truncated = truncateText(text);
+      const truncated = truncateByLimit(text, PDF_MAX_CHARS);
       return {
         ...base,
         kind: "pdf",

@@ -34,8 +34,9 @@ export function MainLayout() {
     sendMessage,
     loading,
     stopGeneration,
-    regenerateFromLastUser,
+    regenerateAssistantMessage,
     editUserMessageAndResend,
+    setAssistantActiveVariant,
     removeMessage,
     retryLast,
     clearClientNotice,
@@ -171,7 +172,8 @@ export function MainLayout() {
             onCopy={() => {}}
             onEditUserMessage={editUserMessageAndResend}
             onDelete={(m) => void removeMessage(m.id)}
-            onRegenerate={regenerateFromLastUser}
+            onRegenerate={regenerateAssistantMessage}
+            onVariantChange={setAssistantActiveVariant}
             onActiveUserMessageChange={setActiveGuideId}
           />
         </div>

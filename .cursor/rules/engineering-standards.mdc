@@ -10,6 +10,8 @@ alwaysApply: true
 ## Git 与提交
 
 - 采用 **功能驱动的原子提交**；一个 PR/一次合并尽量对应清晰主题。
+- **按对话及时提交**：在 Cursor 中完成**同一轮对话**内达成的代码修改后，助手应在该轮收尾前执行 `git add` 与 `git commit`，将本轮相关改动收束为一次提交（或用户要求下拆成少数次主题清晰的提交）；避免多轮对话的未提交改动长期堆叠、难以回顾。
+- **推送**：仅在用户明确要求推送（或流程约定需要）时执行 `git push`；默认以本地提交为先。
 - 提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/)，例如：`feat(chat): ...`、`fix(api): ...`、`docs: ...`、`refactor: ...`、`chore: ...`。
 - 完成一个可合并的逻辑闭环时，在助手回复**末尾**附带一行建议命令示例：`git commit -m 'feat(scope): 简述'`（若本次已形成闭环）。
 

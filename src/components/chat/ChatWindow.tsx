@@ -30,6 +30,7 @@ export function ChatWindow({
   onEditUserMessage,
   onDelete,
   onRegenerate,
+  onVariantChange,
   onActiveUserMessageChange,
 }: {
   /** false 时在 Dexie 引导完成前展示占位，避免欢迎页闪烁 */
@@ -41,7 +42,8 @@ export function ChatWindow({
   onCopy: (m: ChatMessage) => void;
   onEditUserMessage: (id: string, text: string) => void;
   onDelete: (m: ChatMessage) => void;
-  onRegenerate?: () => void;
+  onRegenerate?: (assistantMessageId: string) => void;
+  onVariantChange?: (assistantMessageId: string, variantIdx: number) => void;
   onActiveUserMessageChange?: (messageId: string | null) => void;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -142,17 +144,21 @@ export function ChatWindow({
           <WelcomePanel conversationId={conversationId} />
         ) : (
           <div className="space-y-6">
-            {[...messages.entries()].map(([idx, item]) => {
+            {[...messages.entries()].map(([, item]) => {
               return (
                 <div key={item.id} id={`msg-${item.id}`} data-message-id={item.id}>
                   <MessageBubble
                     message={item}
-                    isLastAssistant={item.role === "assistant" && idx === messages.length - 1}
                     isStreaming={isStreamingMessage(item)}
                     onCopy={() => onCopy(item)}
                     onEditSave={(t) => onEditUserMessage(item.id, t)}
                     onDelete={() => onDelete(item)}
-                    onRegenerate={item.role === "assistant" && idx === messages.length - 1 ? onRegenerate : undefined}
+                    onRegenerate={item.role === "assistant" ? () => onRegenerate?.(item.id) : undefined}
+                    onVariantChange={
+                      item.role === "assistant"
+                        ? (nextVariantIdx) => onVariantChange?.(item.id, nextVariantIdx)
+                        : undefined
+                    }
                   />
                 </div>
               );

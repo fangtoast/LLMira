@@ -46,8 +46,9 @@ export function useModels() {
         const list = mergeWithPresetWhenSparse(ids);
         setModels(list);
 
-        const { activeModel, activeImageModel, setActiveModel, setActiveImageModel } =
+        const { activeModel, activeImageModel, setActiveModel, setActiveImageModel, ensureModelSettingsForModel } =
           useSettingsStore.getState();
+        list.forEach((modelId) => ensureModelSettingsForModel(modelId));
         if (list.length && !list.includes(activeModel)) {
           setActiveModel(list[0]!);
         }
@@ -60,7 +61,9 @@ export function useModels() {
       .catch(() => {
         const fallback = mergeWithPresetWhenSparse([]);
         setModels(fallback);
-        const { activeModel, activeImageModel, setActiveModel, setActiveImageModel } = useSettingsStore.getState();
+        const { activeModel, activeImageModel, setActiveModel, setActiveImageModel, ensureModelSettingsForModel } =
+          useSettingsStore.getState();
+        fallback.forEach((modelId) => ensureModelSettingsForModel(modelId));
         if (fallback.length) {
           if (!fallback.includes(activeModel)) setActiveModel(fallback[0]!);
           const imageList = fallback.filter((m) => /(image|mj|dall|flux|sd|gpt-image)/i.test(m));

@@ -11,6 +11,8 @@ import type { ChatCompletionRequest } from "@/lib/api/types";
 import type { ChatAttachment, ChatMessage } from "@/types";
 
 type ApiMsg = ChatCompletionRequest["messages"][number];
+const ATTACHMENT_CHUNK_SIZE = 12000;
+const ATTACHMENT_MAX_TOTAL_CHARS = 400000;
 
 function getAttachmentImageUrls(message: Pick<ChatMessage, "attachments" | "imageUrls">) {
   const nextImages =
@@ -20,12 +22,40 @@ function getAttachmentImageUrls(message: Pick<ChatMessage, "attachments" | "imag
   return nextImages.length ? nextImages : (message.imageUrls ?? []);
 }
 
+function splitTextIntoChunks(text: string, chunkSize: number) {
+  if (!text) return [];
+  const chunks: string[] = [];
+  for (let i = 0; i < text.length; i += chunkSize) {
+    chunks.push(text.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
 function buildAttachmentText(attachments: ChatAttachment[] = []) {
-  const blocks = attachments
+  const blocks: string[] = [];
+  let remainingBudget = ATTACHMENT_MAX_TOTAL_CHARS;
+  attachments
     .filter((item) => item.status === "ready" && item.textContent)
-    .map((item) => {
-      const suffix = item.textTruncated ? "\n\n[内容过长，已截断]" : "";
-      return `--- 文件内容: ${item.name} ---\n${item.textContent}${suffix}\n---`;
+    .forEach((item) => {
+      if (!item.textContent || remainingBudget <= 0) return;
+      const limitedText = item.textContent.slice(0, remainingBudget);
+      const chunks = splitTextIntoChunks(limitedText, ATTACHMENT_CHUNK_SIZE);
+      const chunkBlocks = chunks.map((chunk, idx) =>
+        [
+          `--- 文件内容: ${item.name}（分块 ${idx + 1}/${chunks.length}） ---`,
+          chunk,
+          "---",
+        ].join("\n"),
+      );
+      const budgetSuffix =
+        limitedText.length < item.textContent.length
+          ? `\n[附件内容过长，当前仅注入前 ${limitedText.length.toLocaleString()} 字符用于本轮回答]`
+          : "";
+      const originalTruncatedSuffix = item.textTruncated ? "\n[文件解析阶段曾发生截断]" : "";
+      blocks.push(...chunkBlocks);
+      if (budgetSuffix) blocks.push(budgetSuffix);
+      if (originalTruncatedSuffix) blocks.push(originalTruncatedSuffix);
+      remainingBudget -= limitedText.length;
     });
   const unavailable = attachments.filter((item) => item.status !== "ready" && item.kind !== "image");
   if (unavailable.length) {
@@ -36,6 +66,25 @@ function buildAttachmentText(attachments: ChatAttachment[] = []) {
 
 function withAttachmentText(content: string, attachments?: ChatAttachment[]) {
   return `${content}${buildAttachmentText(attachments)}`.trim();
+}
+
+function getAssistantActiveSnapshot(message: ChatMessage) {
+  if (message.role !== "assistant" || !message.variants?.length) {
+    return {
+      content: message.content,
+    };
+  }
+  const fallbackIdx = message.variants.length - 1;
+  const idx = Math.max(0, Math.min(fallbackIdx, message.activeVariantIdx ?? fallbackIdx));
+  const selected = message.variants[idx];
+  if (!selected) {
+    return {
+      content: message.content,
+    };
+  }
+  return {
+    content: selected.content,
+  };
 }
 
 /**
@@ -52,7 +101,8 @@ export function buildApiMessagesFromChat(
 ): ApiMsg[] {
   const mapped: ApiMsg[] = history.map((item) => {
     const imageUrls = item.role === "user" ? getAttachmentImageUrls(item) : [];
-    const text = item.role === "user" ? withAttachmentText(item.content, item.attachments) : item.content;
+    const assistantSnapshot = getAssistantActiveSnapshot(item);
+    const text = item.role === "user" ? withAttachmentText(item.content, item.attachments) : assistantSnapshot.content;
     return {
       role: item.role,
       content: imageUrls.length

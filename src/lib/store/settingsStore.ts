@@ -46,6 +46,37 @@ const storage = createJSONStorage<unknown>(() =>
   typeof window === "undefined" ? memoryStorage : webStorage,
 );
 
+export type ModelGenerationSettings = {
+  temperature: number;
+  topP: number;
+  maxTokens: number;
+  presencePenalty: number;
+  frequencyPenalty: number;
+};
+
+const DEFAULT_MODEL_GENERATION_SETTINGS: ModelGenerationSettings = {
+  temperature: 0.7,
+  topP: 1,
+  maxTokens: 4096,
+  presencePenalty: 0,
+  frequencyPenalty: 0,
+};
+
+function clampNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
+}
+
+function sanitizeModelSettings(input: Partial<ModelGenerationSettings>): ModelGenerationSettings {
+  return {
+    temperature: clampNumber(input.temperature ?? DEFAULT_MODEL_GENERATION_SETTINGS.temperature, 0, 2),
+    topP: clampNumber(input.topP ?? DEFAULT_MODEL_GENERATION_SETTINGS.topP, 0, 1),
+    maxTokens: Math.max(1, Math.floor(Number.isFinite(input.maxTokens ?? NaN) ? (input.maxTokens as number) : DEFAULT_MODEL_GENERATION_SETTINGS.maxTokens)),
+    presencePenalty: clampNumber(input.presencePenalty ?? DEFAULT_MODEL_GENERATION_SETTINGS.presencePenalty, -2, 2),
+    frequencyPenalty: clampNumber(input.frequencyPenalty ?? DEFAULT_MODEL_GENERATION_SETTINGS.frequencyPenalty, -2, 2),
+  };
+}
+
 interface SettingsState {
   apiKey: string;
   userName: string;
@@ -54,6 +85,7 @@ interface SettingsState {
   activeImageModel: string;
   generationMode: "chat" | "image";
   enableThinking: boolean;
+  modelSettingsById: Record<string, ModelGenerationSettings>;
   temperature: number;
   topP: number;
   maxTokens: number;
@@ -69,6 +101,9 @@ interface SettingsState {
   setActiveImageModel: (model: string) => void;
   setGenerationMode: (mode: "chat" | "image") => void;
   setEnableThinking: (enable: boolean) => void;
+  ensureModelSettingsForModel: (modelId: string) => void;
+  updateCurrentModelSettings: (patch: Partial<ModelGenerationSettings>) => void;
+  applyCurrentSettingsToAllModels: (modelIds?: string[]) => void;
   setTemperature: (v: number) => void;
   setTopP: (v: number) => void;
   setMaxTokens: (v: number) => void;
@@ -90,11 +125,10 @@ export const useSettingsStore = create<SettingsState>()(
       activeImageModel: "gpt-image-1",
       generationMode: "chat",
       enableThinking: false,
-      temperature: 0.7,
-      topP: 1,
-      maxTokens: 4096,
-      presencePenalty: 0,
-      frequencyPenalty: 0,
+      modelSettingsById: {
+        "gpt-5.5": DEFAULT_MODEL_GENERATION_SETTINGS,
+      },
+      ...DEFAULT_MODEL_GENERATION_SETTINGS,
       sidebarCollapsed: false,
       apiKeyModalOpen: false,
       hasCompletedOnboarding: false,
@@ -102,15 +136,117 @@ export const useSettingsStore = create<SettingsState>()(
       /** 允许空字符串，便于在输入框中删除后重新输入；界面展示处再用默认值兜底 */
       setUserName: (userName) => set({ userName }),
       setUserAvatarText: (userAvatarText) => set({ userAvatarText: userAvatarText.slice(0, 2) }),
-      setActiveModel: (activeModel) => set({ activeModel }),
+      setActiveModel: (activeModel) =>
+        set((state) => {
+          const existing = state.modelSettingsById[activeModel];
+          const nextSettings = sanitizeModelSettings(existing ?? DEFAULT_MODEL_GENERATION_SETTINGS);
+          return {
+            activeModel,
+            modelSettingsById: existing
+              ? state.modelSettingsById
+              : { ...state.modelSettingsById, [activeModel]: nextSettings },
+            ...nextSettings,
+          };
+        }),
       setActiveImageModel: (activeImageModel) => set({ activeImageModel }),
       setGenerationMode: (generationMode) => set({ generationMode }),
       setEnableThinking: (enableThinking) => set({ enableThinking }),
-      setTemperature: (temperature) => set({ temperature }),
-      setTopP: (topP) => set({ topP }),
-      setMaxTokens: (maxTokens) => set({ maxTokens }),
-      setPresencePenalty: (presencePenalty) => set({ presencePenalty }),
-      setFrequencyPenalty: (frequencyPenalty) => set({ frequencyPenalty }),
+      ensureModelSettingsForModel: (modelId) =>
+        set((state) => {
+          if (!modelId || state.modelSettingsById[modelId]) return state;
+          return {
+            modelSettingsById: {
+              ...state.modelSettingsById,
+              [modelId]: sanitizeModelSettings(DEFAULT_MODEL_GENERATION_SETTINGS),
+            },
+          };
+        }),
+      updateCurrentModelSettings: (patch) =>
+        set((state) => {
+          const current = sanitizeModelSettings(state.modelSettingsById[state.activeModel] ?? DEFAULT_MODEL_GENERATION_SETTINGS);
+          const next = sanitizeModelSettings({ ...current, ...patch });
+          return {
+            modelSettingsById: {
+              ...state.modelSettingsById,
+              [state.activeModel]: next,
+            },
+            ...next,
+          };
+        }),
+      applyCurrentSettingsToAllModels: (modelIds) =>
+        set((state) => {
+          const current = sanitizeModelSettings(state.modelSettingsById[state.activeModel] ?? DEFAULT_MODEL_GENERATION_SETTINGS);
+          const baseIds = Object.keys(state.modelSettingsById);
+          const allIds = new Set([state.activeModel, ...baseIds, ...(modelIds ?? [])].filter(Boolean));
+          const modelSettingsById = { ...state.modelSettingsById };
+          allIds.forEach((id) => {
+            modelSettingsById[id] = { ...current };
+          });
+          return {
+            modelSettingsById,
+            ...current,
+          };
+        }),
+      setTemperature: (temperature) =>
+        set((state) => {
+          const current = sanitizeModelSettings(state.modelSettingsById[state.activeModel] ?? DEFAULT_MODEL_GENERATION_SETTINGS);
+          const next = sanitizeModelSettings({ ...current, temperature });
+          return {
+            modelSettingsById: {
+              ...state.modelSettingsById,
+              [state.activeModel]: next,
+            },
+            ...next,
+          };
+        }),
+      setTopP: (topP) =>
+        set((state) => {
+          const current = sanitizeModelSettings(state.modelSettingsById[state.activeModel] ?? DEFAULT_MODEL_GENERATION_SETTINGS);
+          const next = sanitizeModelSettings({ ...current, topP });
+          return {
+            modelSettingsById: {
+              ...state.modelSettingsById,
+              [state.activeModel]: next,
+            },
+            ...next,
+          };
+        }),
+      setMaxTokens: (maxTokens) =>
+        set((state) => {
+          const current = sanitizeModelSettings(state.modelSettingsById[state.activeModel] ?? DEFAULT_MODEL_GENERATION_SETTINGS);
+          const next = sanitizeModelSettings({ ...current, maxTokens });
+          return {
+            modelSettingsById: {
+              ...state.modelSettingsById,
+              [state.activeModel]: next,
+            },
+            ...next,
+          };
+        }),
+      setPresencePenalty: (presencePenalty) =>
+        set((state) => {
+          const current = sanitizeModelSettings(state.modelSettingsById[state.activeModel] ?? DEFAULT_MODEL_GENERATION_SETTINGS);
+          const next = sanitizeModelSettings({ ...current, presencePenalty });
+          return {
+            modelSettingsById: {
+              ...state.modelSettingsById,
+              [state.activeModel]: next,
+            },
+            ...next,
+          };
+        }),
+      setFrequencyPenalty: (frequencyPenalty) =>
+        set((state) => {
+          const current = sanitizeModelSettings(state.modelSettingsById[state.activeModel] ?? DEFAULT_MODEL_GENERATION_SETTINGS);
+          const next = sanitizeModelSettings({ ...current, frequencyPenalty });
+          return {
+            modelSettingsById: {
+              ...state.modelSettingsById,
+              [state.activeModel]: next,
+            },
+            ...next,
+          };
+        }),
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
       setApiKeyModalOpen: (apiKeyModalOpen) => set({ apiKeyModalOpen }),
       setHasCompletedOnboarding: (hasCompletedOnboarding) => set({ hasCompletedOnboarding }),
@@ -126,6 +262,7 @@ export const useSettingsStore = create<SettingsState>()(
         activeImageModel: state.activeImageModel,
         generationMode: state.generationMode,
         enableThinking: state.enableThinking,
+        modelSettingsById: state.modelSettingsById,
         temperature: state.temperature,
         topP: state.topP,
         maxTokens: state.maxTokens,
