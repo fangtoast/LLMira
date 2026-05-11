@@ -2,14 +2,59 @@
 
 基于 Next.js 14 + TypeScript 的本地优先 AI 对话应用，默认对接慧言 OpenAI 兼容接口。
 
+## 快速开始
+
+以下命令均在**本仓库根目录**（`LLMira/`）的终端中执行。
+
+### 1. 安装依赖
+
+```bash
+npm install
+```
+
+### 2. 配置环境变量
+
+```bash
+cp .env.example .env.local
+```
+
+按需编辑 `.env.local`，常用项示例：
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://api.huiyan-ai.cn
+# 可选：模型下拉偏少或拉取失败时，用英文/中文逗号列出常用 id，与接口结果合并
+# 注：此处的 url 可替换为其他 OpenAI 兼容厂商
+# NEXT_PUBLIC_MODEL_PRESET=gpt-5-chat,deepseek-chat
+# 可选：输入框最大字符数（默认 16000）
+# NEXT_PUBLIC_INPUT_MAX_CHARS=16000
+```
+
+### 3. 启动开发服务
+
+```bash
+npm run dev
+```
+
+在浏览器打开 [`http://localhost:3000`](http://localhost:3000)（会重定向到 `/chat`）。若首次进入，按弹窗引导配置昵称、API Key 与模型参数即可开始对话。
+
+### 4. 构建与检查（可选）
+
+```bash
+npm run build
+npm run lint
+```
+
+---
+
+## 命名说明
+
 `LLMira` 可理解为 `LLM + Mira`：
 
 - **LLM**：Large Language Model，表示本项目围绕大模型能力构建。
-- **Mira**：命名灵感来自“镜像 / 映照（mirror）”语义，以及古典词源意象。`Mira` 在现代语言中常被理解为“令人惊叹/美丽”（拉丁语词根 *mirus* 的阴性形式），也可借用其“星名（米拉）”的象征意义。
+- **Mira**：命名灵感来自「镜像 / 映照（mirror）」语义，以及古典词源意象。`Mira` 在现代语言中常被理解为「令人惊叹/美丽」（拉丁语词根 *mirus* 的阴性形式），也可借用其「星名（米拉）」的象征意义。
 
 在本项目语境里，`LLMira` 表达的是：一个面向大模型服务的镜像式接入与交互界面。  
-注：若严格按语言学来源，“Mira”更常见于拉丁语及现代命名传统，而非古希腊语。
-
+注：若严格按语言学来源，「Mira」更常见于拉丁语及现代命名传统，而非古希腊语。
 
 ## 文档与规范
 
@@ -74,46 +119,6 @@ docs/
 
 - [慧言 API 教程](https://doc.zhypub.cn/docs/api/)
 - [OpenAI 协议示例](https://s.apifox.cn/684f53a9-f231-43b0-a0dc-e3224d5ab341/api-179544799)
-
-## 本地开发
-
-1. 安装依赖
-
-```bash
-npm install
-```
-
-1. 配置环境变量
-
-```bash
-cp .env.example .env.local
-```
-
-`.env.local` 示例：
-
-```env
-NEXT_PUBLIC_API_BASE_URL=https://api.huiyan-ai.cn
-# 可选：模型下拉偏少或拉取失败时，用英文/中文逗号列出常用 id，与接口结果合并
-# 注：此处的url `https://api.huiyan-ai.cn` 可以替换为其他api厂家
-# NEXT_PUBLIC_MODEL_PRESET=gpt-5-chat,deepseek-chat
-# 可选：输入框最大字符数（默认 16000）
-# NEXT_PUBLIC_INPUT_MAX_CHARS=16000
-```
-
-1. 启动开发服务
-
-```bash
-npm run dev
-```
-
-访问 `http://localhost:3000`（会重定向到 `/chat`）。
-
-1. 构建与检查
-
-```bash
-npm run build
-npm run lint
-```
 
 ## 日志链路
 
