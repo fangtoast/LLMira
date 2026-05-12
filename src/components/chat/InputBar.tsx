@@ -343,7 +343,7 @@ export function InputBar({
                 type="button"
               >
                 <Wrench className="h-3.5 w-3.5" />
-                工具
+                模式切换
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="start" className="w-40 p-1" sideOffset={6}>
                 <DropdownMenuItem
