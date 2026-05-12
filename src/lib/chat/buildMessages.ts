@@ -2,7 +2,7 @@
  * @project LLMira
  * @file src/lib/chat/buildMessages.ts
  * @author fangtoast <fangtoast@foxmail.com>
- * @date 2026-04-30
+ * @date 2026-05-12
  * @function
  *   - 将会话历史与当前输入组装为 OpenAI `messages`
  * @description 供流式请求构造上下文；多模态用户消息展开为 text + image_url 片段。
@@ -59,7 +59,11 @@ function buildAttachmentText(attachments: ChatAttachment[] = []) {
     });
   const unavailable = attachments.filter((item) => item.status !== "ready" && item.kind !== "image");
   if (unavailable.length) {
-    blocks.push(`以下附件未读取正文，仅提供文件名: ${unavailable.map((item) => item.name).join(", ")}`);
+    const lines = unavailable.map((item) => {
+      const hint = item.errorMessage?.trim();
+      return hint ? `${item.name} — ${hint}` : item.name;
+    });
+    blocks.push(["以下附件未读取正文（模型侧仅能看到文件名与下列说明）：", ...lines.map((l) => `- ${l}`)].join("\n"));
   }
   return blocks.length ? `\n\n${blocks.join("\n\n")}` : "";
 }

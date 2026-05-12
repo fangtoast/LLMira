@@ -22,6 +22,7 @@
     "dexie": "^4.4.2",
     "katex": "^0.16.45",
     "lucide-react": "^1.8.0",
+    "mammoth": "^1.12.0",
     "next": "^14.2.35",
     "next-themes": "^0.4.6",
     "pdfjs-dist": "^4.8.69",

@@ -4,9 +4,10 @@
  * @project LLMira
  * @file src/components/chat/InputBar.tsx
  * @author fangtoast <fangtoast@foxmail.com>
- * @date 2026-04-30
+ * @date 2026-05-12
  * @function
  *   - 多行输入、附件、发送/停止、可选深度思考
+ *   - 附件 accept 与读取态 kind 与 attachmentFormat / parseAttachment 对齐
  * @description 字符上限来自 `NEXT_PUBLIC_INPUT_MAX_CHARS`。
  */
 import { useEffect, useRef, useState, type ClipboardEvent, type ClipboardEventHandler } from "react";
@@ -19,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { FILE_INPUT_ACCEPT, inferAttachmentKind } from "@/lib/files/attachmentFormat";
 import { parseAttachment } from "@/lib/files/parseAttachment";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 import type { ChatAttachment } from "@/types";
@@ -27,17 +29,6 @@ const INPUT_MAX =
   typeof process !== "undefined" && process.env.NEXT_PUBLIC_INPUT_MAX_CHARS
     ? Number.parseInt(process.env.NEXT_PUBLIC_INPUT_MAX_CHARS, 10) || 16000
     : 16000;
-
-function getFileExtension(name: string) {
-  return name.split(".").pop()?.toLowerCase() ?? "";
-}
-
-function inferAttachmentKind(file: File): ChatAttachment["kind"] {
-  if (file.type.startsWith("image/")) return "image";
-  if (file.type === "application/pdf" || getFileExtension(file.name) === "pdf") return "pdf";
-  if (file.type.startsWith("text/") || file.type === "application/json") return "text";
-  return "unsupported";
-}
 
 function createReadingAttachment(file: File): ChatAttachment {
   return {
@@ -238,6 +229,12 @@ export function InputBar({
             {attachments.map((item) => (
               <div
                 key={item.id}
+                title={
+                  item.errorMessage?.trim() ||
+                  (item.status === "unsupported"
+                    ? "此附件正文不会被注入上下文，可移除后换支持的格式"
+                    : undefined)
+                }
                 className="relative flex items-center gap-2 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700 dark:bg-white/10 dark:text-zinc-200"
               >
                 {item.kind === "image" && item.dataUrl ? (
@@ -265,7 +262,7 @@ export function InputBar({
                   </span>
                 ) : item.status === "unsupported" ? (
                   <span className="rounded-full bg-slate-500/10 px-1.5 py-0.5 text-[10px] text-slate-500 dark:text-zinc-400">
-                    仅文件名
+                    不支持
                   </span>
                 ) : null}
                 <button
@@ -294,7 +291,7 @@ export function InputBar({
                 void submit();
               }
             }}
-            placeholder="输入你的问题...（可粘贴/拖入图片或文件；Enter 发送，Shift+Enter 换行）"
+            placeholder="输入你的问题...（可粘贴/拖入附件；不支持的格式会在附件上标注，悬停可看说明；Enter 发送，Shift+Enter 换行）"
             className="min-h-[2.75rem] max-h-48 rounded-2xl border-none bg-transparent leading-relaxed text-slate-900 ring-0 focus-visible:ring-0 dark:text-zinc-100"
           />
           {loading ? (
@@ -331,7 +328,7 @@ export function InputBar({
               附件
               <input
                 type="file"
-                accept="image/*,.pdf,.doc,.docx,.txt,.md,.csv,.json"
+                accept={FILE_INPUT_ACCEPT}
                 multiple
                 className="hidden"
                 onChange={(e) => {

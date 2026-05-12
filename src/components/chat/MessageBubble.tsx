@@ -4,7 +4,7 @@
  * @project LLMira
  * @file src/components/chat/MessageBubble.tsx
  * @author fangtoast <fangtoast@foxmail.com>
- * @date 2026-04-30
+ * @date 2026-05-12
  * @function
  *   - 单条消息 UI：Markdown、思考折叠、图片网格、编辑/复制/重试
  * @description 助手侧解析遗留 `<think>` 标签展示思考内容（兼容部分网关）。
@@ -88,7 +88,7 @@ function MessageBubbleImpl({
   const getAttachmentStatusLabel = (item: NonNullable<ChatMessage["attachments"]>[number]) => {
     if (item.status === "reading") return "读取中";
     if (item.status === "error") return "读取失败";
-    if (item.status === "unsupported") return "仅文件名";
+    if (item.status === "unsupported") return "不支持";
     if (item.kind === "image") return "图片";
     if (item.textTruncated) return "已截断";
     return "内容已读取";
