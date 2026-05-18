@@ -1,34 +1,19 @@
-<span id="readme-zh-cn"></span>
 
-<div align="center">
 
-<img src="public/llmira-logo.svg" alt="LLMira" width="120" />
 
-<h1>LLMira</h1>
 
-<p>
-  基于 Next.js 14 与 TypeScript 的本地优先 AI 对话应用，默认对接慧言 OpenAI 兼容接口。
-  <br />
-  流式对话、多模态附件、文生图、会话持久化与导出一站式完成。
-</p>
 
-<p>
-  <strong><a href="#english-version">English</a></strong>
-  &nbsp;·&nbsp;
-  <a href="docs/README.md"><strong>文档索引</strong></a>
-  &nbsp;·&nbsp;
-  <a href="docs/engineering/architecture.md">架构</a>
-  &nbsp;·&nbsp;
-  <a href="https://doc.zhypub.cn/docs/api/">慧言 API</a>
-</p>
 
-<p>
-  <img src="https://img.shields.io/badge/Next.js-14-000000?style=flat-square" alt="Next.js 14" />
-  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/App%20Router-App-000000?style=flat-square" alt="App Router" />
-</p>
+# LLMira
 
-</div>
+基于 Next.js 14 与 TypeScript 的本地优先 AI 对话应用，默认对接慧言 OpenAI 兼容接口。   
+流式对话、多模态附件、文生图、会话持久化与导出一站式完成。
+
+**[English](#english-version)**  ·  **文档索引**  ·  架构  ·  [慧言 API](https://doc.zhypub.cn/docs/api/)
+
+
+
+
 
 ---
 
@@ -44,16 +29,20 @@ LLMira 将以下几部分组合在一起：
 
 ## 快速上手
 
+**环境准备：** 安装 [Node.js](https://nodejs.org/)（建议 **18.17+** 或 **20 LTS**，与 Next.js 14 要求一致；安装包自带 **npm**）。终端执行 `node -v`、`npm -v` 确认可用。若通过 Git 获取代码，还需安装 [Git](https://git-scm.com/)。本地开发用现代浏览器（Chrome、Edge、Firefox、Safari 等）即可。
+
 以下命令均在**本仓库根目录**（`LLMira/`）执行。
 
 ```bash
 npm install
 cp .env.example .env.local
-# 按需编辑 .env.local
+# 按需编辑 .env.local （该用其他api时需要修改该文件）
 npm run dev
 ```
 
-浏览器打开 [`http://localhost:3000`](http://localhost:3000)（会重定向到 `/chat`）。首次进入可按引导配置昵称、API Key 与模型参数。
+浏览器打开 `[http://localhost:3000](http://localhost:3000)`（会重定向到 `/chat`）。首次进入可按引导配置昵称、API Key 与模型参数。
+
+**不用慧言 API、改用自己或第三方的 OpenAI 兼容服务时：** 在 `.env.local` 把 `NEXT_PUBLIC_API_BASE_URL` 改成对方提供的**根地址**（路径里**不要**再拼 `/v1`，代码会自动接 `/v1/...`）。保存后**重启** `npm run dev`。启动后在应用里填的 API Key 须与该地址**同属一家**服务。若模型列表异常，可再配合 `NEXT_PUBLIC_MODEL_PRESET`（见 [.env.example](.env.example) / [docs/README.md](docs/README.md)）。
 
 ```bash
 # 可选：生产构建与检查
@@ -65,13 +54,15 @@ npm run lint
 
 ## 你想……
 
-| 你想…… | 可以这样做 |
-| --- | --- |
-| 从零跑起来 | 按上文「快速上手」执行 `npm install` → `.env.local` → `npm run dev` |
-| 浏览模块文档 | [docs/README.md](docs/README.md) |
-| 了解目录与边界 | [docs/engineering/architecture.md](docs/engineering/architecture.md) |
-| 参与开发与提交规范 | [docs/engineering/CONTRIBUTING.md](docs/engineering/CONTRIBUTING.md) |
+
+| 你想……        | 可以这样做                                                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 从零跑起来       | 按上文「快速上手」执行 `npm install` → `.env.local` → `npm run dev`                                                                             |
+| 浏览模块文档      | [docs/README.md](docs/README.md)                                                                                                     |
+| 了解目录与边界     | [docs/engineering/architecture.md](docs/engineering/architecture.md)                                                                 |
+| 参与开发与提交规范   | [docs/engineering/CONTRIBUTING.md](docs/engineering/CONTRIBUTING.md)                                                                 |
 | 查 API 协议与示例 | [慧言 API 教程](https://doc.zhypub.cn/docs/api/) · [OpenAI 协议示例](https://s.apifox.cn/684f53a9-f231-43b0-a0dc-e3224d5ab341/api-179544799) |
+
 
 Next.js 应用细节与约束见 [AGENTS.md](AGENTS.md)。
 
@@ -96,11 +87,13 @@ LLMira/
 
 ## 本地开发
 
-| 目的 | 命令 | 说明 |
-| --- | --- | --- |
-| 日常界面与联调 | `npm run dev` | 读取 `.env.local` |
-| 生产构建验证 | `npm run build` / `npm start` | 部署前自检 |
-| 代码风格 | `npm run lint` | ESLint |
+
+| 目的      | 命令                            | 说明              |
+| ------- | ----------------------------- | --------------- |
+| 日常界面与联调 | `npm run dev`                 | 读取 `.env.local` |
+| 生产构建验证  | `npm run build` / `npm start` | 部署前自检           |
+| 代码风格    | `npm run lint`                | ESLint          |
+
 
 环境变量可参考 `.env.example`，例如：`NEXT_PUBLIC_API_BASE_URL`、`NEXT_PUBLIC_MODEL_PRESET`、`NEXT_PUBLIC_INPUT_MAX_CHARS`、`NEXT_PUBLIC_LOG_LEVEL` / `LOG_LEVEL` 等。
 
@@ -138,7 +131,7 @@ LLMira/
 
 ## 日志
 
-请使用 `@/lib/logger`（`debug` / `info` / `warn` / `error`），勿在业务代码中裸用 `console.*`。级别由 `NEXT_PUBLIC_LOG_LEVEL` 或 `LOG_LEVEL` 控制（默认 `info`）。
+请使用 `@/lib/logger`（`debug` / `info` / `warn` / `error`），勿在业务代码中裸用 `console.`*。级别由 `NEXT_PUBLIC_LOG_LEVEL` 或 `LOG_LEVEL` 控制（默认 `info`）。
 
 ## Docker 部署
 
@@ -163,57 +156,42 @@ docker run --rm -p 3000:3000 --env NEXT_PUBLIC_API_BASE_URL=https://api.huiyan-a
 
 ### 页面整体（暗色主题）
 
-![页面整体（暗色）](./images/LLMira.png)
+页面整体（暗色）
 
 ### 页面整体（亮色主题）
 
-![页面整体（亮色）](./images/LLMira(light).png)
+页面整体（亮色）
 
 ### 切换文生图模式
 
-![切换文生图模式](./images/select%20tool.png)
+切换文生图模式
 
 ### 设置模型参数
 
-![设置模型参数](./images/settings.png)
+设置模型参数
 
 ### 切换模型
 
-![切换模型](./images/select%20model.png)
+切换模型
 
 ---
 
-<span id="english-version"></span>
 
-<div align="center">
 
-<img src="public/llmira-logo.svg" alt="LLMira" width="120" />
 
-<h1>LLMira</h1>
 
-<p>
-  A local-first AI chat app built with Next.js 14 and TypeScript, targeting an OpenAI-compatible API (Huiyan by default).
-  <br />
-  Streaming chat, multimodal attachments, image generation, persistence, and exports in one place.
-</p>
 
-<p>
-  <strong><a href="#readme-zh-cn">中文版</a></strong>
-  &nbsp;·&nbsp;
-  <a href="docs/README.md"><strong>Docs index</strong></a>
-  &nbsp;·&nbsp;
-  <a href="docs/engineering/architecture.md">Architecture</a>
-  &nbsp;·&nbsp;
-  <a href="https://doc.zhypub.cn/docs/api/">Huiyan API</a>
-</p>
 
-<p>
-  <img src="https://img.shields.io/badge/Next.js-14-000000?style=flat-square" alt="Next.js 14" />
-  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/App%20Router-App-000000?style=flat-square" alt="App Router" />
-</p>
+# LLMira
 
-</div>
+A local-first AI chat app built with Next.js 14 and TypeScript, targeting an OpenAI-compatible API (Huiyan by default).   
+Streaming chat, multimodal attachments, image generation, persistence, and exports in one place.
+
+**[中文版](#readme-zh-cn)**  ·  **Docs index**  ·  Architecture  ·  [Huiyan API](https://doc.zhypub.cn/docs/api/)
+
+
+
+
 
 ---
 
@@ -229,6 +207,8 @@ The name suggests **LLM** plus **Mira** (mirror / reflection): an interface that
 
 ## Quick start
 
+**Prerequisites:** Install [Node.js](https://nodejs.org/) (**18.17+** or **20 LTS** recommended; matches Next.js 14; includes **npm**). Run `node -v` and `npm -v` to verify. Install [Git](https://git-scm.com/) if you clone the repo. Use a modern browser for local dev.
+
 Run these from the **repository root** (`LLMira/`).
 
 ```bash
@@ -238,7 +218,9 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open [`http://localhost:3000`](http://localhost:3000) (redirects to `/chat`). First launch walks you through nickname, API key, and model settings.
+Open `[http://localhost:3000](http://localhost:3000)` (redirects to `/chat`). First launch walks you through nickname, API key, and model settings.
+
+**Using a non-Huiyan OpenAI-compatible provider:** set `NEXT_PUBLIC_API_BASE_URL` in `.env.local` to the provider’s **root** base URL (**do not** append `/v1`; paths like `/v1/...` are added in code). **Restart** `npm run dev` after saving. The in-app API key must match **the same** provider as that base URL. If the models list looks wrong, add `NEXT_PUBLIC_MODEL_PRESET` (see [.env.example](.env.example) / [docs/README.md](docs/README.md)).
 
 ```bash
 # Optional: production build & checks
@@ -250,13 +232,15 @@ For environment variables, see `.env.example` and the **Develop locally** table 
 
 ## If you want to…
 
-| You want to… | Do this |
-| --- | --- |
-| Run from scratch | `npm install` → `.env.local` → `npm run dev` |
-| Browse module docs | [docs/README.md](docs/README.md) |
-| Understand layout & boundaries | [docs/engineering/architecture.md](docs/engineering/architecture.md) |
-| Contribute (Git/logging/style) | [docs/engineering/CONTRIBUTING.md](docs/engineering/CONTRIBUTING.md) |
-| Read API shapes & examples | [Huiyan API docs](https://doc.zhypub.cn/docs/api/) · [OpenAI-style example](https://s.apifox.cn/684f53a9-f231-43b0-a0dc-e3224d5ab341/api-179544799) |
+
+| You want to…                   | Do this                                                                                                                                             |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Run from scratch               | `npm install` → `.env.local` → `npm run dev`                                                                                                        |
+| Browse module docs             | [docs/README.md](docs/README.md)                                                                                                                    |
+| Understand layout & boundaries | [docs/engineering/architecture.md](docs/engineering/architecture.md)                                                                                |
+| Contribute (Git/logging/style) | [docs/engineering/CONTRIBUTING.md](docs/engineering/CONTRIBUTING.md)                                                                                |
+| Read API shapes & examples     | [Huiyan API docs](https://doc.zhypub.cn/docs/api/) · [OpenAI-style example](https://s.apifox.cn/684f53a9-f231-43b0-a0dc-e3224d5ab341/api-179544799) |
+
 
 App-router conventions and constraints: see [AGENTS.md](AGENTS.md).
 
@@ -281,11 +265,13 @@ LLMira/
 
 ## Develop locally
 
-| Goal | Command | Notes |
-| --- | --- | --- |
-| Day-to-day dev | `npm run dev` | Uses `.env.local` |
-| Production-like check | `npm run build` / `npm start` | Before deploy |
-| Lint | `npm run lint` | ESLint |
+
+| Goal                  | Command                       | Notes             |
+| --------------------- | ----------------------------- | ----------------- |
+| Day-to-day dev        | `npm run dev`                 | Uses `.env.local` |
+| Production-like check | `npm run build` / `npm start` | Before deploy     |
+| Lint                  | `npm run lint`                | ESLint            |
+
 
 Configure via `.env.example`: e.g. `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_MODEL_PRESET`, `NEXT_PUBLIC_INPUT_MAX_CHARS`, `NEXT_PUBLIC_LOG_LEVEL` / `LOG_LEVEL`.
 
@@ -324,7 +310,7 @@ Configure via `.env.example`: e.g. `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_MODE
 
 ## Logging
 
-Use `@/lib/logger` (`debug` / `info` / `warn` / `error`). Avoid raw `console.*` in application code. Level via `NEXT_PUBLIC_LOG_LEVEL` or `LOG_LEVEL` (default `info`).
+Use `@/lib/logger` (`debug` / `info` / `warn` / `error`). Avoid raw `console.`* in application code. Level via `NEXT_PUBLIC_LOG_LEVEL` or `LOG_LEVEL` (default `info`).
 
 ## Docker
 
@@ -345,20 +331,20 @@ docker run --rm -p 3000:3000 --env NEXT_PUBLIC_API_BASE_URL=https://api.huiyan-a
 
 ### Dark theme
 
-![Dark theme](./images/LLMira.png)
+Dark theme
 
 ### Light theme
 
-![Light theme](./images/LLMira(light).png)
+Light theme
 
 ### Switch to image mode
 
-![Image mode](./images/select%20tool.png)
+Image mode
 
 ### Model parameters
 
-![Model parameters](./images/settings.png)
+Model parameters
 
 ### Switch model
 
-![Switch model](./images/select%20model.png)
+Switch model
