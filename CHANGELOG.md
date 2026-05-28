@@ -8,6 +8,7 @@
 
 ### Added
 
+- 侧栏「设置」中增加 API Key 配置入口，可随时打开弹窗更换密钥（与发消息时缺失 Key 的弹窗共用）。
 - 附件解析中的 `reading` 状态：输入区展示「读取中」，解析完成前禁止发送。
 - 按模型的生成参数持久化（`temperature`、`top_p`、`max_tokens`、`presence` / `frequency` penalty）；侧边栏支持「将当前参数应用到全部模型」。
 - 构造 API `messages` 时对附件正文做分块注入（带分块序号），并设总字符预算以降低超上下文风险。

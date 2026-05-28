@@ -6,7 +6,7 @@
  * @author fangtoast <fangtoast@foxmail.com>
  * @date 2026-04-30
  * @function
- *   - 会话列表、搜索、导入导出、设置入口、折叠宽度
+ *   - 会话列表、搜索、导入导出、设置（含 API Key）、折叠宽度
  * @description 小屏抽屉 / 桌面固定栏；与 `useConversations` 同步。
  */
 import { useRef, useState } from "react";
@@ -59,6 +59,8 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
     setFrequencyPenalty,
     setUserName,
     setUserAvatarText,
+    apiKey,
+    setApiKeyModalOpen,
     applyCurrentSettingsToAllModels,
   } = useSettingsStore();
   const models = useModels();
@@ -371,6 +373,21 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                   className="w-16 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
                 />
               </label>
+              <div className="space-y-1.5 rounded-md border border-border/60 bg-background/60 p-2 dark:border-zinc-700 dark:bg-zinc-800/50">
+                <div className="flex items-center justify-between gap-2">
+                  <span>API Key</span>
+                  <span className="text-[11px] text-muted-foreground">{apiKey ? "已配置" : "未配置"}</span>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 w-full text-xs"
+                  onClick={() => setApiKeyModalOpen(true)}
+                >
+                  {apiKey ? "更换 API Key" : "配置 API Key"}
+                </Button>
+              </div>
               <label className="flex items-center justify-between gap-2">
                 <span>Temperature</span>
                 <input
