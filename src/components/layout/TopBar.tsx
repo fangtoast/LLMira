@@ -46,7 +46,7 @@ export function TopBar({
   } = useSettingsStore();
   const models = useModels();
   const imageModels = models.filter((item) => /(image|mj|dall|flux|sd|gpt-image)/i.test(item));
-  const modelOptions = generationMode === "image" ? (imageModels.length > 0 ? imageModels : models) : models;
+  const modelOptions = generationMode === "image" ? [...new Set([...imageModels, ...models])] : models;
   const currentModel = generationMode === "image" ? activeImageModel : activeModel;
   const selectValue = currentModel
     ? modelOptions.includes(currentModel)

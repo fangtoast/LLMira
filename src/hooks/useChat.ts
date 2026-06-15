@@ -11,12 +11,12 @@
  */
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { buildApiMessagesFromChat } from "@/lib/chat/buildMessages";
-import { DEFAULT_STREAM_TIMEOUT_MS, generateImage, streamChatCompletion, type ApiRequestProfile } from "@/lib/api/client";
-import type { StreamAbortReason } from "@/lib/api/types";
+import { DEFAULT_STREAM_TIMEOUT_MS, generateImage, normalizeBaseUrl, streamChatCompletion, type ApiRequestProfile } from "@/lib/api/client";
+import type { ImageGenerationRequest, StreamAbortReason } from "@/lib/api/types";
 import { useChatStore } from "@/lib/store/chatStore";
 import { useSettingsStore, type ModelGenerationSettings } from "@/lib/store/settingsStore";
 import { useConversations } from "./useConversations";
-import type { ChatAttachment, ChatMessage, ChatMessageVariant } from "@/types";
+import type { ApiRequestSnapshot, ChatAttachment, ChatMessage, ChatMessageVariant } from "@/types";
 
 function uid() {
   return crypto.randomUUID();
@@ -40,6 +40,17 @@ function isAbortError(e: unknown): boolean {
 function isImageModel(modelName?: string): boolean {
   if (!modelName) return false;
   return /(image|mj|dall|flux|sd|gpt-image)/i.test(modelName);
+}
+
+function createImageRequestSnapshot(apiProfile: ApiRequestProfile, body: ImageGenerationRequest): ApiRequestSnapshot {
+  const baseUrl = normalizeBaseUrl(apiProfile.baseUrl);
+  return {
+    kind: "image",
+    baseUrl,
+    endpoint: `${baseUrl}/v1/images/generations`,
+    body,
+    createdAt: Date.now(),
+  };
 }
 
 /**
@@ -257,21 +268,45 @@ export function useChat() {
       const { conversationId, assistantId, prompt, imageModel, apiProfile } = params;
       const ac = new AbortController();
       streamAbortRef.current = ac;
+      const imagePayload: ImageGenerationRequest = { model: imageModel, prompt: prompt || " ", size: "1024x1024" };
+      const requestSnapshot = createImageRequestSnapshot(apiProfile, imagePayload);
+      updateMessage(conversationId, assistantId, {
+        modelName: imageModel,
+        requestSnapshot,
+      });
 
       try {
         const images = await generateImage(
           apiProfile,
-          { model: imageModel, prompt: prompt || " ", size: "1024x1024" },
+          imagePayload,
           { signal: ac.signal },
         );
         const text = images.length ? images.map((url) => `![generated](${url})`).join("\n\n") : "未生成图片，请检查模型或配额。";
-        updateMessage(conversationId, assistantId, {
-          content: text,
-          modelName: imageModel,
-          generatedImageUrls: images,
-        });
         const list = useChatStore.getState().messagesByConversation[conversationId] ?? [];
-        await saveFinalMessages(conversationId, list);
+        const final = list.map((m) => {
+          if (m.id !== assistantId) return m;
+          const base: ChatMessage = {
+            ...m,
+            content: text,
+            modelName: imageModel,
+            generatedImageUrls: images,
+            requestSnapshot,
+          };
+          if (m.variants) {
+            const newVariant: ChatMessageVariant = {
+              content: text,
+              modelName: imageModel,
+              generatedImageUrls: images,
+              requestSnapshot,
+              createdAt: m.createdAt,
+            };
+            const variants = [...m.variants, newVariant];
+            return { ...base, variants, activeVariantIdx: variants.length - 1 };
+          }
+          return base;
+        });
+        replaceMessages(conversationId, final);
+        await saveFinalMessages(conversationId, final);
       } catch (error) {
         if (isAbortError(error)) {
           const kind = streamUserAbortKindRef.current;
@@ -288,7 +323,7 @@ export function useChat() {
         throw error;
       }
     },
-    [patchAssistantMessage, saveFinalMessages, updateMessage],
+    [patchAssistantMessage, replaceMessages, saveFinalMessages, updateMessage],
   );
 
   const sendMessage = useCallback(
@@ -447,6 +482,8 @@ export function useChat() {
           thinkingContent: targetAssistant.thinkingContent,
           modelName: targetAssistant.modelName,
           tokenUsage: targetAssistant.tokenUsage,
+          generatedImageUrls: targetAssistant.generatedImageUrls,
+          requestSnapshot: targetAssistant.requestSnapshot,
           createdAt: targetAssistant.createdAt,
         },
       ];

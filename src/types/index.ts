@@ -34,6 +34,17 @@ export interface ChatMessageVariant {
   thinkingContent?: string;
   modelName?: string;
   tokenUsage?: TokenUsage;
+  generatedImageUrls?: string[];
+  requestSnapshot?: ApiRequestSnapshot;
+  createdAt: number;
+}
+
+/** 单次请求快照；仅保存可调试字段，不保存 API Key。 */
+export interface ApiRequestSnapshot {
+  kind: "chat" | "image";
+  baseUrl: string;
+  endpoint: string;
+  body: unknown;
   createdAt: number;
 }
 
@@ -52,6 +63,8 @@ export interface ChatMessage {
   /** @deprecated 旧版图片附件字段；新逻辑优先使用 `attachments`。 */
   imageUrls?: string[];
   generatedImageUrls?: string[];
+  /** 最近一次实际发送的请求体快照，便于核对模型与中转站。 */
+  requestSnapshot?: ApiRequestSnapshot;
   /** 重新生成时保留的历史版本快照（按生成顺序，0-based）。 */
   variants?: ChatMessageVariant[];
   /** 持久化上次浏览的版本索引，默认展示最新版本。 */

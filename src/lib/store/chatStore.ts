@@ -37,7 +37,12 @@ interface ChatState {
   updateMessage: (
     conversationId: string,
     messageId: string,
-    patch: Partial<Pick<ChatMessage, "content" | "thinkingContent" | "imageUrls" | "generatedImageUrls" | "modelName" | "tokenUsage">>,
+    patch: Partial<
+      Pick<
+        ChatMessage,
+        "content" | "thinkingContent" | "imageUrls" | "generatedImageUrls" | "modelName" | "tokenUsage" | "requestSnapshot" | "variants" | "activeVariantIdx"
+      >
+    >,
   ) => void;
   deleteMessage: (conversationId: string, messageId: string) => void;
   replaceMessages: (conversationId: string, messages: ChatMessage[]) => void;

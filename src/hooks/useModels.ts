@@ -58,10 +58,9 @@ export function useModels() {
         if (list.length && !list.includes(activeModel)) {
           setActiveModel(list[0]!);
         }
-        const imageList = list.filter((item) => /(image|mj|dall|flux|sd|gpt-image)/i.test(item));
-        const forImage = imageList.length > 0 ? imageList : list;
-        if (forImage.length && !forImage.includes(activeImageModel)) {
-          setActiveImageModel(forImage[0]!);
+        if (list.length && !list.includes(activeImageModel)) {
+          const imageList = list.filter((item) => /(image|mj|dall|flux|sd|gpt-image)/i.test(item));
+          setActiveImageModel((imageList[0] ?? list[0])!);
         }
       })
       .catch(() => {
@@ -72,9 +71,10 @@ export function useModels() {
         fallback.forEach((modelId) => ensureModelSettingsForModel(modelId));
         if (fallback.length) {
           if (!fallback.includes(activeModel)) setActiveModel(fallback[0]!);
-          const imageList = fallback.filter((m) => /(image|mj|dall|flux|sd|gpt-image)/i.test(m));
-          const forImage = imageList.length > 0 ? imageList : fallback;
-          if (!forImage.includes(activeImageModel)) setActiveImageModel(forImage[0]!);
+          if (!fallback.includes(activeImageModel)) {
+            const imageList = fallback.filter((m) => /(image|mj|dall|flux|sd|gpt-image)/i.test(m));
+            setActiveImageModel((imageList[0] ?? fallback[0])!);
+          }
         }
       });
   }, [activeApiProfileId, apiProfiles]);

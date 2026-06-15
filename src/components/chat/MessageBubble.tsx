@@ -10,7 +10,7 @@
  * @description 助手侧解析遗留 `<think>` 标签展示思考内容（兼容部分网关）。
  */
 import { memo, useEffect, useState } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileText, Pencil, RefreshCw, Trash2, ZoomIn } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Code2, Copy, Download, FileText, Pencil, RefreshCw, Trash2, ZoomIn } from "lucide-react";
 import { MarkdownRenderer } from "@/components/markdown/MarkdownRenderer";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +43,8 @@ function MessageBubbleImpl({
   const [editOpen, setEditOpen] = useState(false);
   const [editText, setEditText] = useState(message.content);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestCopied, setRequestCopied] = useState(false);
   const [failedImageKeys, setFailedImageKeys] = useState<Record<string, boolean>>({});
   const [reloadSeed, setReloadSeed] = useState<Record<string, number>>({});
   const isUser = message.role === "user";
@@ -62,6 +64,9 @@ function MessageBubbleImpl({
   const displayContent = activeVariant?.content ?? message.content;
   const displayThinkingRaw = activeVariant?.thinkingContent ?? message.thinkingContent;
   const displayModelName = activeVariant?.modelName ?? message.modelName;
+  const displayGeneratedImageUrls = activeVariant?.generatedImageUrls ?? message.generatedImageUrls;
+  const displayRequestSnapshot = activeVariant?.requestSnapshot ?? message.requestSnapshot;
+  const requestBodyText = displayRequestSnapshot ? JSON.stringify(displayRequestSnapshot.body, null, 2) : "";
 
   const extractThinkFromContent = (raw: string) => {
     const regex = /<think>([\s\S]*?)<\/think>/gi;
@@ -141,6 +146,13 @@ function MessageBubbleImpl({
     document.body.removeChild(a);
     setCopiedImageKey(key);
     setTimeout(() => setCopiedImageKey((v) => (v === key ? null : v)), 1500);
+  };
+
+  const doCopyRequestBody = async () => {
+    if (!requestBodyText) return;
+    await navigator.clipboard.writeText(requestBodyText);
+    setRequestCopied(true);
+    setTimeout(() => setRequestCopied(false), 1500);
   };
 
   const renderImageCard = (url: string, key: string, className: string) => {
@@ -301,9 +313,9 @@ function MessageBubbleImpl({
                 {message.imageUrls.map((url, idx) => renderImageCard(url, `a-u-${idx}-${url.slice(0, 24)}`, "max-h-48 w-full cursor-zoom-in object-cover"))}
               </div>
             ) : null}
-            {message.generatedImageUrls?.length ? (
+            {displayGeneratedImageUrls?.length ? (
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {message.generatedImageUrls.map((url, idx) => renderImageCard(url, `g-${idx}-${url.slice(0, 24)}`, "max-h-64 w-full cursor-zoom-in object-contain bg-black/5"))}
+                {displayGeneratedImageUrls.map((url, idx) => renderImageCard(url, `g-${idx}-${url.slice(0, 24)}`, "max-h-64 w-full cursor-zoom-in object-contain bg-black/5"))}
               </div>
             ) : null}
 
@@ -359,6 +371,11 @@ function MessageBubbleImpl({
                   <RefreshCw className="h-3.5 w-3.5" />
                 </Button>
               ) : null}
+              {displayRequestSnapshot ? (
+                <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => setRequestOpen(true)} title="查看请求体">
+                  <Code2 className="h-3.5 w-3.5" />
+                </Button>
+              ) : null}
               <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onDelete} title="删除">
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -400,6 +417,29 @@ function MessageBubbleImpl({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={previewUrl} alt="preview" className="max-h-[80vh] w-full rounded-md object-contain" />
           ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
+        <DialogContent className="max-w-2xl">
+          <div className="space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-medium text-foreground">本次请求体</h3>
+                {displayRequestSnapshot ? (
+                  <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                    <div className="truncate">Endpoint: {displayRequestSnapshot.endpoint}</div>
+                    <div className="truncate">Base URL: {displayRequestSnapshot.baseUrl}</div>
+                  </div>
+                ) : null}
+              </div>
+              <Button type="button" size="sm" variant="outline" onClick={() => void doCopyRequestBody()}>
+                {requestCopied ? "已复制" : "复制 body"}
+              </Button>
+            </div>
+            <pre className="max-h-[60vh] overflow-auto rounded-xl border border-border/70 bg-muted/45 p-3 text-xs leading-5 text-foreground">
+              <code>{requestBodyText || "暂无请求体"}</code>
+            </pre>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

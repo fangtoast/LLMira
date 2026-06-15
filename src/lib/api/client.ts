@@ -27,7 +27,7 @@ export type ApiRequestProfile = {
   baseUrl: string;
 };
 
-function normalizeBaseUrl(baseUrl?: string) {
+export function normalizeBaseUrl(baseUrl?: string) {
   const raw = (baseUrl || fallbackBaseUrl).trim();
   return raw.replace(/\/+$/g, "").replace(/\/v1$/i, "") || fallbackBaseUrl;
 }
