@@ -19,6 +19,7 @@ export interface ChatCompletionRequest {
   model: string;
   messages: { role: ChatRole; content: string | ChatContentPart[] }[];
   stream?: boolean;
+  group?: "auto" | string;
   temperature?: number;
   top_p?: number;
   max_tokens?: number;
@@ -61,6 +62,12 @@ export interface ImageGenerationRequest {
   model: string;
   prompt: string;
   size?: string;
+  taskType?: "IMAGE" | string;
+  quality?: "auto" | "standard" | "hd" | string;
+  response_format?: "url" | "b64_json" | string;
+  n?: number;
+  image?: string[];
+  aspect_ratio?: string;
 }
 
 /** 未提供 API Key 时由 `getHeaders` 抛出。 */

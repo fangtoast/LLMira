@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { buildApiMessagesFromChat } from "@/lib/chat/buildMessages";
 import { DEFAULT_STREAM_TIMEOUT_MS, generateImage, normalizeBaseUrl, streamChatCompletion, type ApiRequestProfile } from "@/lib/api/client";
-import type { ImageGenerationRequest, StreamAbortReason } from "@/lib/api/types";
+import type { ChatCompletionRequest, ImageGenerationRequest, StreamAbortReason } from "@/lib/api/types";
 import { useChatStore } from "@/lib/store/chatStore";
 import { useSettingsStore, type ModelGenerationSettings } from "@/lib/store/settingsStore";
 import { useConversations } from "./useConversations";
@@ -42,12 +42,58 @@ function isImageModel(modelName?: string): boolean {
   return /(image|mj|dall|flux|sd|gpt-image)/i.test(modelName);
 }
 
-function createImageRequestSnapshot(apiProfile: ApiRequestProfile, body: ImageGenerationRequest): ApiRequestSnapshot {
+function shouldUseChatImageEndpoint(modelName: string): boolean {
+  return /(gpt-4o-image|gemini.*image|image-preview)/i.test(modelName) && !/gpt-image|dall/i.test(modelName);
+}
+
+function getAttachmentImageUrls(attachments: ChatAttachment[] = []) {
+  return attachments
+    .filter((item) => item.kind === "image" && item.status === "ready" && (item.remoteUrl || item.dataUrl))
+    .map((item) => item.remoteUrl || item.dataUrl!)
+    .filter(Boolean);
+}
+
+function extractGeneratedImageUrls(content: string) {
+  const urls = Array.from(content.matchAll(/!\[[^\]]*]\(([^)]+)\)|(https?:\/\/[^\s)]+)/g))
+    .map((match) => match[1] ?? match[2] ?? "")
+    .filter(Boolean);
+  return [...new Set(urls)];
+}
+
+function createImageGenerationPayload(model: string, prompt: string, imageUrls: string[]): ImageGenerationRequest {
+  const base = {
+    model,
+    prompt: prompt || " ",
+    quality: "auto",
+    response_format: "url",
+    n: 1,
+  } satisfies ImageGenerationRequest;
+
+  if (imageUrls.length > 0) {
+    return {
+      ...base,
+      image: imageUrls,
+    };
+  }
+
+  return {
+    ...base,
+    taskType: "IMAGE",
+    size: "auto",
+  };
+}
+
+function createRequestSnapshot(
+  apiProfile: ApiRequestProfile,
+  kind: ApiRequestSnapshot["kind"],
+  path: string,
+  body: unknown,
+): ApiRequestSnapshot {
   const baseUrl = normalizeBaseUrl(apiProfile.baseUrl);
   return {
-    kind: "image",
+    kind,
     baseUrl,
-    endpoint: `${baseUrl}/v1/images/generations`,
+    endpoint: `${baseUrl}${path}`,
     body,
     createdAt: Date.now(),
   };
@@ -264,37 +310,91 @@ export function useChat() {
   );
 
   const runImageForAssistant = useCallback(
-    async (params: { conversationId: string; assistantId: string; prompt: string; imageModel: string; apiProfile: ApiRequestProfile }) => {
-      const { conversationId, assistantId, prompt, imageModel, apiProfile } = params;
+    async (params: {
+      conversationId: string;
+      assistantId: string;
+      userMessage: ChatMessage;
+      prompt: string;
+      attachments: ChatAttachment[];
+      imageModel: string;
+      apiProfile: ApiRequestProfile;
+      historyMessages?: ChatMessage[];
+    }) => {
+      const { conversationId, assistantId, userMessage, prompt, attachments, imageModel, apiProfile, historyMessages } = params;
       const ac = new AbortController();
       streamAbortRef.current = ac;
-      const imagePayload: ImageGenerationRequest = { model: imageModel, prompt: prompt || " ", size: "1024x1024" };
-      const requestSnapshot = createImageRequestSnapshot(apiProfile, imagePayload);
+      const history =
+        historyMessages ??
+        (useChatStore.getState().messagesByConversation[conversationId] ?? []).filter(
+          (m) => m.id !== userMessage.id && m.id !== assistantId,
+        );
+      const imageUrls = getAttachmentImageUrls(attachments);
+      const useChatImageEndpoint = shouldUseChatImageEndpoint(imageModel);
+      const requestBody = useChatImageEndpoint
+        ? {
+            model: imageModel,
+            group: "auto",
+            messages: buildApiMessagesFromChat(history, prompt, attachments),
+            stream: true,
+          }
+        : createImageGenerationPayload(imageModel, prompt, imageUrls);
+      const requestSnapshot = createRequestSnapshot(
+        apiProfile,
+        useChatImageEndpoint ? "chat" : "image",
+        useChatImageEndpoint ? "/v1/chat/completions" : "/v1/images/generations",
+        requestBody,
+      );
       updateMessage(conversationId, assistantId, {
         modelName: imageModel,
         requestSnapshot,
       });
 
       try {
-        const images = await generateImage(
-          apiProfile,
-          imagePayload,
-          { signal: ac.signal },
-        );
-        const text = images.length ? images.map((url) => `![generated](${url})`).join("\n\n") : "未生成图片，请检查模型或配额。";
+        let text = "";
+        let images: string[] = [];
+        if (useChatImageEndpoint) {
+          await streamChatCompletion(
+            apiProfile,
+            requestBody as ChatCompletionRequest,
+            {
+              onToken: (token) => {
+                text += token;
+                patchAssistantMessage(conversationId, assistantId, { content: text });
+              },
+              onDone: async () => {
+                images = extractGeneratedImageUrls(text);
+              },
+              onAbort: async (reason) => {
+                const abortedText = formatAbortedStreamAssistantContent(text, reason);
+                patchAssistantMessage(conversationId, assistantId, { content: abortedText });
+                text = abortedText;
+              },
+            },
+            { signal: ac.signal, streamTimeoutMs: DEFAULT_STREAM_TIMEOUT_MS },
+          );
+          images = extractGeneratedImageUrls(text);
+        } else {
+          images = await generateImage(
+            apiProfile,
+            requestBody as ImageGenerationRequest,
+            { signal: ac.signal },
+          );
+          text = images.length ? images.map((url) => `![generated](${url})`).join("\n\n") : "";
+        }
+        const finalText = text || "未生成图片，请检查模型或配额。";
         const list = useChatStore.getState().messagesByConversation[conversationId] ?? [];
         const final = list.map((m) => {
           if (m.id !== assistantId) return m;
           const base: ChatMessage = {
             ...m,
-            content: text,
+            content: finalText,
             modelName: imageModel,
             generatedImageUrls: images,
             requestSnapshot,
           };
           if (m.variants) {
             const newVariant: ChatMessageVariant = {
-              content: text,
+              content: finalText,
               modelName: imageModel,
               generatedImageUrls: images,
               requestSnapshot,
@@ -392,7 +492,9 @@ export function useChat() {
           await runImageForAssistant({
             conversationId,
             assistantId,
+            userMessage,
             prompt: trimmed,
+            attachments,
             imageModel: selectedImageModel,
             apiProfile,
           });
@@ -509,9 +611,12 @@ export function useChat() {
           await runImageForAssistant({
             conversationId: convId,
             assistantId: assistantMessageId,
+            userMessage: targetUser,
             prompt: targetUser.content,
+            attachments: targetUser.attachments ?? [],
             imageModel: selectedImageModel,
             apiProfile,
+            historyMessages,
           });
         } else {
           await runStreamForAssistant({
@@ -629,7 +734,9 @@ export function useChat() {
           await runImageForAssistant({
             conversationId: convId,
             assistantId,
+            userMessage: updatedUser,
             prompt: newContent,
+            attachments: updatedUser.attachments ?? [],
             imageModel: selectedImageModel,
             apiProfile,
           });
