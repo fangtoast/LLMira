@@ -23,7 +23,6 @@ const SCROLL_BOTTOM_THRESHOLD = 72;
 export function ChatWindow({
   hydrated = true,
   messages,
-  conversationId,
   loading,
   isStreamingMessage,
   onCopy,
@@ -36,7 +35,6 @@ export function ChatWindow({
   /** false 时在 Dexie 引导完成前展示占位，避免欢迎页闪烁 */
   hydrated?: boolean;
   messages: ChatMessage[];
-  conversationId?: string | null;
   loading: boolean;
   isStreamingMessage: (m: ChatMessage) => boolean;
   onCopy: (m: ChatMessage) => void;
@@ -141,7 +139,7 @@ export function ChatWindow({
     >
       <div className="mx-auto w-full max-w-4xl py-6 sm:py-8">
         {messages.length === 0 ? (
-          <WelcomePanel conversationId={conversationId} />
+          <WelcomePanel />
         ) : (
           <div className="space-y-6">
             {[...messages.entries()].map(([, item]) => {

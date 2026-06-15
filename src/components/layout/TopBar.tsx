@@ -13,10 +13,10 @@ import { useEffect, useState } from "react";
 import { Menu, Moon, Sun, Trash2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import { ModelMenu } from "@/components/chat/ModelMenu";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 import { useModels } from "@/hooks/useModels";
 import { BRAND_ICON_PATH, BRAND_NAME } from "@/lib/brand";
-import { cn } from "@/lib/utils";
 
 type TopBarProps = {
   /** 打开移动端侧栏时的回调 */
@@ -59,10 +59,6 @@ export function TopBar({
     setMounted(true);
   }, []);
 
-  const selectClass = cn(
-    "h-9 w-full min-w-0 max-w-[9.5rem] rounded-full bg-secondary/80 px-3 text-xs text-foreground outline-none ring-1 ring-border/70 transition hover:bg-accent focus:ring-ring sm:max-w-[12rem] md:max-w-[14rem] lg:max-w-[16rem] dark:bg-white/5 dark:hover:bg-white/10",
-  );
-
   if (!mounted) {
     return (
       <header className="sticky top-0 z-20 flex h-14 min-w-0 items-center gap-1.5 bg-background/75 px-3 backdrop-blur-xl sm:gap-2 sm:px-5">
@@ -79,9 +75,7 @@ export function TopBar({
           </span>
         </div>
         <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:gap-2">
-          <select className={selectClass} value="" disabled aria-label="模型加载中">
-            <option value="">模型加载中...</option>
-          </select>
+          <ModelMenu value="" models={[]} onChange={() => undefined} triggerClassName="max-w-[9.5rem] sm:max-w-[12rem] md:max-w-[14rem] lg:max-w-[16rem]" />
           <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-accent" disabled>
             <Moon className="h-4 w-4" />
           </Button>
@@ -112,26 +106,15 @@ export function TopBar({
         </span>
       </div>
       <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5 sm:gap-2">
-        <select
-          className={selectClass}
+        <ModelMenu
           value={selectValue}
-          onChange={(e) => {
-            const v = e.target.value;
+          models={modelOptions}
+          onChange={(v) => {
             if (generationMode === "image") setActiveImageModel(v);
             else setActiveModel(v);
           }}
-        >
-          {currentModel && !modelOptions.includes(currentModel) ? (
-            <option key={currentModel} value={currentModel}>
-              {currentModel}（不在当前列表）
-            </option>
-          ) : null}
-          {modelOptions.map((model) => (
-            <option key={model} value={model}>
-              {model}
-            </option>
-          ))}
-        </select>
+          triggerClassName="max-w-[9.5rem] sm:max-w-[12rem] md:max-w-[14rem] lg:max-w-[16rem]"
+        />
         {hydrated && activeConversationId && onDeleteCurrentConversation ? (
           <Button
             type="button"

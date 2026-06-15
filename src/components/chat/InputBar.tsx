@@ -11,18 +11,21 @@
  * @description 字符上限来自 `NEXT_PUBLIC_INPUT_MAX_CHARS`。
  */
 import { useEffect, useRef, useState, type ClipboardEvent, type ClipboardEventHandler } from "react";
-import { ArrowUp, CheckCircle2, FileText, FileUp, Loader2, Sparkles, Square, Wrench, X } from "lucide-react";
+import { ArrowUp, CheckCircle2, FileText, FileUp, Loader2, MessageCircle, Paintbrush, Sparkles, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { ModelMenu } from "@/components/chat/ModelMenu";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useModels } from "@/hooks/useModels";
 import { FILE_INPUT_ACCEPT, inferAttachmentKind } from "@/lib/files/attachmentFormat";
 import { parseAttachment } from "@/lib/files/parseAttachment";
 import { useSettingsStore } from "@/lib/store/settingsStore";
+import { cn } from "@/lib/utils";
 import type { ChatAttachment } from "@/types";
 
 const INPUT_MAX =
@@ -46,12 +49,32 @@ export function InputBar({
   onSend,
   onStop,
   loading,
+  placement = "bottom",
 }: {
   onSend: (payload: { text: string; attachments?: ChatAttachment[] }) => Promise<void>;
   onStop: () => void;
   loading: boolean;
+  placement?: "bottom" | "center";
 }) {
-  const { generationMode, setGenerationMode, enableThinking, setEnableThinking } = useSettingsStore();
+  const {
+    activeModel,
+    activeImageModel,
+    generationMode,
+    setGenerationMode,
+    setActiveModel,
+    setActiveImageModel,
+    enableThinking,
+    setEnableThinking,
+  } = useSettingsStore();
+  const models = useModels();
+  const imageModels = models.filter((item) => /(image|mj|dall|flux|sd|gpt-image)/i.test(item));
+  const modelOptions = generationMode === "image" ? (imageModels.length > 0 ? imageModels : models) : models;
+  const currentModel = generationMode === "image" ? activeImageModel : activeModel;
+  const selectValue = currentModel
+    ? modelOptions.includes(currentModel)
+      ? currentModel
+      : currentModel
+    : (modelOptions[0] ?? "");
   const [value, setValue] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [dragActive, setDragActive] = useState(false);
@@ -199,7 +222,10 @@ export function InputBar({
 
   return (
     <div
-      className="px-3 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6"
+      className={cn(
+        "px-3 sm:px-6",
+        placement === "bottom" ? "pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]" : "py-0",
+      )}
       onDragEnter={(e) => {
         e.preventDefault();
         setDragActive(true);
@@ -219,13 +245,9 @@ export function InputBar({
         await mergeAttachments(files);
       }}
     >
-      <div
-        className={`llmira-soft-pop mx-auto w-full min-w-0 max-w-4xl rounded-[28px] border border-slate-200/80 bg-white/90 p-3 backdrop-blur-xl transition-all duration-300 shadow-[0_16px_42px_rgba(15,23,42,0.14)] hover:shadow-[0_20px_50px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-[#242424]/95 dark:shadow-[0_18px_48px_rgba(0,0,0,0.34)] sm:rounded-[36px] ${
-          dragActive ? "scale-[1.01] ring-2 ring-primary/40" : ""
-        }`}
-      >
+      <div className="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-2">
         {attachments.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-2 px-1">
+          <div className="llmira-soft-pop flex flex-wrap gap-2 px-1">
             {attachments.map((item) => (
               <div
                 key={item.id}
@@ -276,7 +298,75 @@ export function InputBar({
             ))}
           </div>
         )}
-
+        <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 text-xs text-muted-foreground">
+            <span className="rounded-full bg-secondary/70 px-2.5 py-1 ring-1 ring-border/50 dark:bg-white/5">
+              即将使用：<span className="font-medium text-foreground">{selectValue || "模型加载中"}</span>
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground sm:justify-end">
+            <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary/70 px-3 text-xs ring-1 ring-border/50 transition hover:bg-accent dark:bg-white/5 dark:hover:bg-white/10">
+              <FileUp className="h-3.5 w-3.5" />
+              附件
+              <input
+                type="file"
+                accept={FILE_INPUT_ACCEPT}
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  void handleUpload(e.target.files);
+                  e.currentTarget.value = "";
+                }}
+              />
+            </label>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary/70 px-3 text-xs text-inherit outline-none ring-1 ring-border/50 transition hover:bg-accent dark:bg-white/5 dark:hover:bg-white/10"
+                type="button"
+              >
+                {generationMode === "image" ? <Paintbrush className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}
+                {generationMode === "image" ? "文生图" : "对话"}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start" className="w-40 rounded-2xl p-1.5" sideOffset={6}>
+                <DropdownMenuItem className="gap-2 rounded-xl text-xs" onSelect={() => setGenerationMode("chat")}>
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  对话模式{generationMode === "chat" ? " ✓" : ""}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="gap-2 rounded-xl text-xs" onSelect={() => setGenerationMode("image")}>
+                  <Paintbrush className="h-3.5 w-3.5" />
+                  文生图模式{generationMode === "image" ? " ✓" : ""}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <button
+              type="button"
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary/70 px-3 text-xs ring-1 ring-border/50 transition hover:bg-accent dark:bg-white/5 dark:hover:bg-white/10",
+                enableThinking && "bg-primary/12 text-primary ring-primary/20 dark:bg-white/10 dark:text-zinc-50",
+              )}
+              onClick={() => setEnableThinking(!enableThinking)}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              思考{enableThinking ? " 开" : ""}
+            </button>
+            <ModelMenu
+              value={selectValue}
+              models={modelOptions}
+              align="end"
+              triggerClassName="h-8 max-w-[11rem] bg-secondary/70 dark:bg-white/5"
+              onChange={(model) => {
+                if (generationMode === "image") setActiveImageModel(model);
+                else setActiveModel(model);
+              }}
+            />
+          </div>
+        </div>
+        <div
+          className={cn(
+            "llmira-soft-pop w-full rounded-[28px] border border-slate-200/80 bg-white/90 px-3 py-2 backdrop-blur-xl transition-all duration-300 shadow-[0_16px_42px_rgba(15,23,42,0.14)] hover:shadow-[0_20px_50px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-[#242424]/95 dark:shadow-[0_18px_48px_rgba(0,0,0,0.34)] sm:rounded-[34px]",
+            dragActive && "scale-[1.01] ring-2 ring-primary/40",
+          )}
+        >
         <div className="flex items-end gap-2">
           <Textarea
             ref={textareaRef}
@@ -292,7 +382,7 @@ export function InputBar({
               }
             }}
             placeholder={generationMode === "image" ? "描述你想生成的画面..." : "有问题，尽管问"}
-            className="min-h-[2.75rem] max-h-48 rounded-2xl border-none bg-transparent text-base leading-relaxed text-slate-900 ring-0 placeholder:text-slate-400 focus-visible:ring-0 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+            className="min-h-[2.5rem] max-h-36 rounded-2xl border-none bg-transparent px-1 text-base leading-relaxed text-slate-900 ring-0 placeholder:text-slate-400 focus-visible:ring-0 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
           {loading ? (
             <Button
@@ -321,67 +411,6 @@ export function InputBar({
           </span>
           {hasReadingAttachments ? <span>附件读取中，完成后可发送</span> : null}
         </div>
-        <div className="mt-2 flex flex-col gap-2 px-1 text-sm text-slate-600 dark:text-zinc-400 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <label className="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-full px-2 py-1 hover:bg-white/10">
-              <FileUp className="h-3.5 w-3.5" />
-              附件
-              <input
-                type="file"
-                accept={FILE_INPUT_ACCEPT}
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  void handleUpload(e.target.files);
-                  e.currentTarget.value = "";
-                }}
-              />
-            </label>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-full border-none bg-transparent px-2 py-1 text-sm text-inherit outline-none hover:bg-white/10"
-                type="button"
-              >
-                <Wrench className="h-3.5 w-3.5" />
-                模式切换
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" className="w-40 p-1" sideOffset={6}>
-                <DropdownMenuItem
-                  className="text-xs"
-                  onSelect={() => setGenerationMode("chat")}
-                >
-                  对话模式{generationMode === "chat" ? " ✓" : ""}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-xs"
-                  onSelect={() => setGenerationMode("image")}
-                >
-                  文生图模式{generationMode === "image" ? " ✓" : ""}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <label className="inline-flex min-h-9 items-center gap-1 rounded-full px-2 py-1 hover:bg-white/10">
-              <Sparkles className="h-3.5 w-3.5" />
-              思考
-              <input
-                type="checkbox"
-                checked={enableThinking}
-                onChange={(e) => setEnableThinking(e.target.checked)}
-                className="ml-1"
-              />
-            </label>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs sm:justify-end sm:gap-3">
-            <span className="inline-flex min-h-7 items-center gap-1 rounded-full px-2 py-1 text-zinc-400">
-              当前: {generationMode === "image" ? "文生图" : "对话"}
-            </span>
-            {enableThinking && generationMode === "chat" ? (
-              <span className="inline-flex min-h-7 items-center gap-1 rounded-full px-2 py-1 hover:bg-white/10">
-                <Sparkles className="h-3.5 w-3.5" />
-                深度思考已开启
-              </span>
-            ) : null}
-          </div>
         </div>
       </div>
     </div>

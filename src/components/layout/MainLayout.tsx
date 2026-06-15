@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { bootstrapSessionFromIndexedDb } from "@/lib/chat/bootstrapSession";
 import { ChatWindow } from "@/components/chat/ChatWindow";
+import { WelcomePanel } from "@/components/chat/WelcomePanel";
 import { GuideRail, type GuideItem } from "@/components/chat/GuideRail";
 import { InputBar } from "@/components/chat/InputBar";
 import { TokenStats } from "@/components/chat/TokenStats";
@@ -47,6 +48,7 @@ export function MainLayout() {
     () => (activeConversationId ? (messagesByConversation[activeConversationId] ?? []) : []),
     [activeConversationId, messagesByConversation],
   );
+  const showEmptyStage = hydrated && messages.length === 0;
   const artifactContent = useMemo(() => {
     const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
     if (!lastAssistant) return "";
@@ -163,24 +165,36 @@ export function MainLayout() {
           </div>
         ) : null}
         <div className="min-h-0 flex-1">
-          <ChatWindow
-            hydrated={hydrated}
-            messages={messages}
-            conversationId={activeConversationId}
-            loading={loading}
-            isStreamingMessage={isStreamingMessage}
-            onCopy={() => {}}
-            onEditUserMessage={editUserMessageAndResend}
-            onDelete={(m) => void removeMessage(m.id)}
-            onRegenerate={regenerateAssistantMessage}
-            onVariantChange={setAssistantActiveVariant}
-            onActiveUserMessageChange={setActiveGuideId}
-          />
+          {showEmptyStage ? (
+            <div className="flex h-full min-h-0 flex-col items-center justify-center gap-8 px-3 pb-20">
+              <WelcomePanel />
+              <div className="w-full">
+                <InputBar onSend={sendMessage} onStop={stopGeneration} loading={loading} placement="center" />
+              </div>
+            </div>
+          ) : (
+            <ChatWindow
+              hydrated={hydrated}
+              messages={messages}
+              loading={loading}
+              isStreamingMessage={isStreamingMessage}
+              onCopy={() => {}}
+              onEditUserMessage={editUserMessageAndResend}
+              onDelete={(m) => void removeMessage(m.id)}
+              onRegenerate={regenerateAssistantMessage}
+              onVariantChange={setAssistantActiveVariant}
+              onActiveUserMessageChange={setActiveGuideId}
+            />
+          )}
         </div>
-        <div className="mx-auto w-full max-w-4xl px-3">
-          <TokenStats usage={lastTokenUsage} />
-        </div>
-        <InputBar onSend={sendMessage} onStop={stopGeneration} loading={loading} />
+        {!showEmptyStage ? (
+          <>
+            <div className="mx-auto w-full max-w-4xl px-3">
+              <TokenStats usage={lastTokenUsage} />
+            </div>
+            <InputBar onSend={sendMessage} onStop={stopGeneration} loading={loading} />
+          </>
+        ) : null}
       </section>
       {rightPanelView === "guide" ? (
         <GuideRail
