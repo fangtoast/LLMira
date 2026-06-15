@@ -131,7 +131,7 @@ export function MainLayout() {
   }, []);
 
   return (
-    <div className="flex h-[100dvh] min-h-0 w-full min-w-0 overflow-x-hidden bg-background text-foreground dark:bg-zinc-900">
+    <div className="flex h-[100dvh] min-h-0 w-full min-w-0 overflow-x-hidden bg-background text-foreground dark:bg-[#0f0f0f]">
       {mobileSidebarOpen && !isMdUp ? (
         <button
           type="button"
@@ -144,7 +144,7 @@ export function MainLayout() {
         mobileOpen={mobileSidebarOpen}
         onMobileClose={() => setMobileSidebarOpen(false)}
       />
-      <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden bg-card/65 shadow-[inset_24px_0_36px_-28px_rgba(0,0,0,0.15)] dark:bg-zinc-900/96 dark:shadow-[inset_24px_0_36px_-28px_rgba(0,0,0,0.42)] md:min-w-0">
+      <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden bg-background shadow-[inset_20px_0_32px_-30px_rgba(0,0,0,0.28)] dark:bg-[#101010] md:min-w-0">
         <TopBar
           onOpenMobileMenu={() => setMobileSidebarOpen(true)}
           activeConversationId={activeConversationId}
@@ -152,7 +152,7 @@ export function MainLayout() {
           onDeleteCurrentConversation={confirmDeleteCurrentConversation}
         />
         {clientNotice ? (
-          <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+          <div className="mx-auto mt-2 flex w-[calc(100%-1.5rem)] max-w-4xl flex-wrap items-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 shadow-lg shadow-black/10 backdrop-blur dark:text-amber-100">
             <span className="min-w-0 flex-1">{clientNotice}</span>
             <Button size="sm" variant="outline" className="shrink-0" onClick={() => void retryLast()}>
               重试
@@ -177,7 +177,7 @@ export function MainLayout() {
             onActiveUserMessageChange={setActiveGuideId}
           />
         </div>
-        <div className="mx-auto w-full max-w-3xl px-3">
+        <div className="mx-auto w-full max-w-4xl px-3">
           <TokenStats usage={lastTokenUsage} />
         </div>
         <InputBar onSend={sendMessage} onStop={stopGeneration} loading={loading} />

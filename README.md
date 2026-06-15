@@ -22,7 +22,7 @@
 LLMira 将以下几部分组合在一起：
 
 1. **对话界面**：左侧历史会话、右侧主对话区；桌面端可折叠侧栏，移动端抽屉式导航；深色 / 浅色主题。
-2. **模型与参数**：通过 `GET /v1/models` 拉取模型列表，支持按模型保存生成参数，并可一键应用到全部模型。
+2. **模型与参数**：通过当前 API 中转站的 `GET /v1/models` 拉取模型列表，支持多 Profile 切换、按模型保存生成参数，并可一键应用到全部模型。
 3. **本地数据与工具**：Dexie.js 会话持久化、搜索 / 重命名 / 导出（JSON、Markdown、纯文本）与导入；统一结构化日志 `@/lib/logger`。
 
 面向大模型服务的「镜像式」接入：`LLM` + `Mira`（映照与交互界面）。详见下文「命名说明」。
@@ -42,7 +42,7 @@ npm run dev
 
 浏览器打开 `[http://localhost:3000](http://localhost:3000)`（会重定向到 `/chat`）。首次进入可按引导配置昵称、API Key 与模型参数。
 
-**不用慧言 API、改用自己或第三方的 OpenAI 兼容服务时：** 在 `.env.local` 把 `NEXT_PUBLIC_API_BASE_URL` 改成对方提供的**根地址**（路径里**不要**再拼 `/v1`，代码会自动接 `/v1/...`）。保存后**重启** `npm run dev`。启动后在应用里填的 API Key 须与该地址**同属一家**服务。若模型列表异常，可再配合 `NEXT_PUBLIC_MODEL_PRESET`（见 [.env.example](.env.example) / [docs/README.md](docs/README.md)）。
+**不用慧言 API、改用自己或第三方的 OpenAI 兼容服务时：** 可以在应用侧栏「设置 → API 中转站」新增多个 Profile，并分别填写名称、Base URL、API Key 与可选模型预设；点击切换后模型列表、对话与文生图都会使用当前 Profile。也可以在 `.env.local` 把 `NEXT_PUBLIC_API_BASE_URL` 作为默认根地址（路径里**不要**再拼 `/v1`，代码会自动接 `/v1/...`）。
 
 ```bash
 # 可选：生产构建与检查
@@ -105,6 +105,7 @@ LLMira/
 - 可选「深度思考」分区展示（可折叠）
 - 消息级：复制、编辑用户消息并重答、删除、最后一条助手重新生成
 - 顶部 **文生图 / 对话** 模式切换
+- 应用内 API 中转站 Profile 切换，适配多个 OpenAI 兼容服务
 
 ### 输入与附件
 
@@ -115,7 +116,8 @@ LLMira/
 ### 内容与数据
 
 - Markdown + LaTeX (KaTeX) + 代码高亮与复制
-- 文生图网格、预览、下载、重试
+- 文生图网格、预览、下载、重试；文生图模式会按当前选择的图片模型发起请求
+- Markdown 外链悬停预览，点击以安全新标签打开
 - 侧栏搜索、重命名、导出 / 导入
 - 宽屏提问导览与 Artifacts 面板
 
@@ -200,7 +202,7 @@ Streaming chat, multimodal attachments, image generation, persistence, and expor
 LLMira brings together:
 
 1. **Chat UX**: Conversation history sidebar + main pane; collapsible sidebar on desktop and a drawer on mobile; light/dark themes.
-2. **Models & parameters**: Models from `GET /v1/models`, per-model generation settings, and optional apply-to-all-models.
+2. **Models & parameters**: Models from the active API relay profile’s `GET /v1/models`, multiple switchable profiles, per-model generation settings, and optional apply-to-all-models.
 3. **Local persistence & tooling**: Dexie-backed sessions, search/rename/import/export (JSON, Markdown, plain text), and structured logging via `@/lib/logger`.
 
 The name suggests **LLM** plus **Mira** (mirror / reflection): an interface that reflects your chosen model API.
@@ -220,7 +222,7 @@ npm run dev
 
 Open `[http://localhost:3000](http://localhost:3000)` (redirects to `/chat`). First launch walks you through nickname, API key, and model settings.
 
-**Using a non-Huiyan OpenAI-compatible provider:** set `NEXT_PUBLIC_API_BASE_URL` in `.env.local` to the provider’s **root** base URL (**do not** append `/v1`; paths like `/v1/...` are added in code). **Restart** `npm run dev` after saving. The in-app API key must match **the same** provider as that base URL. If the models list looks wrong, add `NEXT_PUBLIC_MODEL_PRESET` (see [.env.example](.env.example) / [docs/README.md](docs/README.md)).
+**Using a non-Huiyan OpenAI-compatible provider:** add profiles in the app sidebar under “Settings → API relay”, with a name, Base URL, API key, and optional model preset for each provider. Switching profiles immediately changes model listing, chat, and image generation. You can still set `NEXT_PUBLIC_API_BASE_URL` in `.env.local` as the default root base URL (**do not** append `/v1`; paths like `/v1/...` are added in code).
 
 ```bash
 # Optional: production build & checks
@@ -283,6 +285,7 @@ Configure via `.env.example`: e.g. `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_MODE
 - Optional “deep thinking” separated from the final answer (collapsible)
 - Per-message actions: copy, edit user message and re-run, delete, regenerate last assistant turn
 - **Chat vs image generation** mode toggle at the top
+- In-app API relay profiles for multiple OpenAI-compatible services
 
 ### Input & attachments
 
@@ -294,7 +297,8 @@ Configure via `.env.example`: e.g. `NEXT_PUBLIC_API_BASE_URL`, `NEXT_PUBLIC_MODE
 ### Content & data
 
 - Markdown + LaTeX (KaTeX) + syntax-highlighted code with copy
-- Image grid with preview, download, retry
+- Image grid with preview, download, retry; image mode sends requests with the currently selected image model
+- Markdown external-link hover previews, with safe new-tab opening on click
 - Sidebar search/rename/import/export
 - Wide-screen outline navigation and Artifacts panel
 

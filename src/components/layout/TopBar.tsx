@@ -60,12 +60,12 @@ export function TopBar({
   }, []);
 
   const selectClass = cn(
-    "h-8 w-full min-w-0 max-w-[9.5rem] rounded-xl bg-card px-1.5 text-xs text-foreground outline-none ring-1 ring-border sm:max-w-[12rem] md:max-w-[14rem] lg:max-w-[16rem]",
+    "h-9 w-full min-w-0 max-w-[9.5rem] rounded-full bg-secondary/80 px-3 text-xs text-foreground outline-none ring-1 ring-border/70 transition hover:bg-accent focus:ring-ring sm:max-w-[12rem] md:max-w-[14rem] lg:max-w-[16rem] dark:bg-white/5 dark:hover:bg-white/10",
   );
 
   if (!mounted) {
     return (
-      <header className="sticky top-0 z-20 flex h-11 min-w-0 items-center gap-1.5 bg-card/70 px-3 sm:gap-2 sm:px-5 backdrop-blur-md shadow-[0_1px_0_rgba(15,23,42,0.08)] dark:shadow-[0_1px_0_rgba(255,255,255,0.05)]">
+      <header className="sticky top-0 z-20 flex h-14 min-w-0 items-center gap-1.5 bg-background/75 px-3 backdrop-blur-xl sm:gap-2 sm:px-5">
         {onOpenMobileMenu ? (
           <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0 md:hidden" disabled aria-label="打开菜单">
             <Menu className="h-5 w-5" />
@@ -82,7 +82,7 @@ export function TopBar({
           <select className={selectClass} value="" disabled aria-label="模型加载中">
             <option value="">模型加载中...</option>
           </select>
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:bg-accent" disabled>
+          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-accent" disabled>
             <Moon className="h-4 w-4" />
           </Button>
         </div>
@@ -91,13 +91,13 @@ export function TopBar({
   }
 
   return (
-    <header className="sticky top-0 z-20 flex h-11 min-w-0 items-center gap-1.5 bg-card/70 px-3 sm:gap-2 sm:px-5 backdrop-blur-md shadow-[0_1px_0_rgba(15,23,42,0.08)] dark:shadow-[0_1px_0_rgba(255,255,255,0.05)]">
+    <header className="sticky top-0 z-20 flex h-14 min-w-0 items-center gap-1.5 bg-background/75 px-3 backdrop-blur-xl sm:gap-2 sm:px-5">
       {onOpenMobileMenu ? (
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="h-9 w-9 shrink-0 md:hidden"
+          className="h-9 w-9 shrink-0 rounded-full md:hidden"
           onClick={onOpenMobileMenu}
           aria-label="打开侧栏与历史"
         >
@@ -137,7 +137,7 @@ export function TopBar({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+          className="h-9 w-9 shrink-0 rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
             onClick={onDeleteCurrentConversation}
             aria-label="删除当前会话"
             title="删除当前会话"
@@ -148,7 +148,7 @@ export function TopBar({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 shrink-0 rounded-xl text-muted-foreground hover:bg-accent"
+          className="h-9 w-9 shrink-0 rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
           onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
         >
           {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

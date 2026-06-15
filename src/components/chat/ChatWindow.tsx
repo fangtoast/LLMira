@@ -137,16 +137,16 @@ export function ChatWindow({
     <div
       ref={rootRef}
       onScroll={onScroll}
-      className="relative h-full overflow-auto px-3 sm:px-6"
+      className="relative h-full overflow-auto scroll-smooth px-3 sm:px-6"
     >
-      <div className="mx-auto w-full max-w-3xl py-6 sm:py-8">
+      <div className="mx-auto w-full max-w-4xl py-6 sm:py-8">
         {messages.length === 0 ? (
           <WelcomePanel conversationId={conversationId} />
         ) : (
           <div className="space-y-6">
             {[...messages.entries()].map(([, item]) => {
               return (
-                <div key={item.id} id={`msg-${item.id}`} data-message-id={item.id}>
+                <div key={item.id} id={`msg-${item.id}`} data-message-id={item.id} className="llmira-message-enter">
                   <MessageBubble
                     message={item}
                     isStreaming={isStreamingMessage(item)}
@@ -173,7 +173,7 @@ export function ChatWindow({
           variant="outline"
           className={cn(
             "absolute bottom-4 right-4 z-10 h-9 rounded-full shadow-md",
-            "bg-background/90 backdrop-blur",
+            "bg-background/90 backdrop-blur transition hover:-translate-y-0.5",
           )}
           onClick={() => scrollToBottom("smooth")}
         >

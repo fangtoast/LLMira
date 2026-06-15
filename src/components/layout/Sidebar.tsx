@@ -10,7 +10,7 @@
  * @description 小屏抽屉 / 桌面固定栏；与 `useConversations` 同步。
  */
 import { useRef, useState } from "react";
-import { Download, Pencil, Plus, ChevronLeft, ChevronRight, Settings2, Trash2, Upload, X } from "lucide-react";
+import { Download, Pencil, Plus, ChevronLeft, ChevronRight, KeyRound, Settings2, Trash2, Upload, X } from "lucide-react";
 import {
   exportConversationJson,
   exportConversationMarkdown,
@@ -60,6 +60,12 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
     setUserName,
     setUserAvatarText,
     apiKey,
+    apiProfiles,
+    activeApiProfileId,
+    setActiveApiProfileId,
+    addApiProfile,
+    updateApiProfile,
+    deleteApiProfile,
     setApiKeyModalOpen,
     applyCurrentSettingsToAllModels,
   } = useSettingsStore();
@@ -87,6 +93,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const activeConv = conversations.find((c) => c.id === activeConversationId);
   const activeMessages = activeConversationId ? (messagesByConversation[activeConversationId] ?? []) : [];
   const expanded = !sidebarCollapsed || !isMdUp;
+  const activeApiProfile = apiProfiles.find((item) => item.id === activeApiProfileId) ?? apiProfiles[0];
 
   const downloadFile = (filename: string, content: string, mime: string) => {
     const a = document.createElement("a");
@@ -99,10 +106,10 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-card text-card-foreground dark:bg-zinc-950 dark:text-zinc-100",
-        "fixed left-0 top-0 z-50 w-72 max-w-[min(18rem,calc(100vw-0.5rem))] border-r border-border/50 shadow-xl transition-transform duration-200 ease-out",
+        "flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-card text-card-foreground dark:bg-[#1f1f1f] dark:text-zinc-100",
+        "fixed left-0 top-0 z-50 w-72 max-w-[min(18rem,calc(100vw-0.5rem))] border-r border-border/50 shadow-xl transition-[width,transform] duration-300 ease-out",
         mobileOpen ? "translate-x-0" : "-translate-x-full",
-        "md:static md:z-10 md:h-screen md:max-h-screen md:w-16 md:translate-x-0 md:border-0 md:shadow-[inset_-1px_0_0_rgba(255,255,255,0.04),16px_0_30px_-22px_rgba(0,0,0,0.35)]",
+        "md:static md:z-10 md:h-screen md:max-h-screen md:w-16 md:translate-x-0 md:border-0 md:shadow-[inset_-1px_0_0_rgba(255,255,255,0.06)]",
         !sidebarCollapsed && "md:w-72",
       )}
     >
@@ -125,7 +132,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
         {expanded && (
           <Button
             size="sm"
-            className="shrink-0 rounded-xl bg-secondary text-secondary-foreground hover:bg-accent dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            className="shrink-0 rounded-full bg-secondary text-secondary-foreground transition hover:bg-accent dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
             onClick={() => {
               void createConversation(activeModel);
               onMobileClose?.();
@@ -146,7 +153,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
               void searchConversations(v);
             }}
             placeholder="搜索标题与消息内容"
-            className="rounded-xl border-none bg-secondary text-foreground ring-1 ring-border dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-800"
+            className="rounded-full border-none bg-secondary text-foreground ring-1 ring-border transition focus-visible:ring-ring dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700"
           />
           <div className="flex flex-wrap gap-1">
             <Button
@@ -287,10 +294,10 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
           <div
             key={item.id}
             className={cn(
-              "group mb-1 flex items-center gap-1 rounded-full px-3 py-1.5 transition-colors",
+              "group mb-1 flex items-center gap-1 rounded-2xl px-3 py-1.5 transition-all duration-200",
               activeConversationId === item.id
-                ? "bg-secondary text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border))] dark:bg-zinc-800/95 dark:text-zinc-100 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
-                : "hover:bg-accent/70 text-muted-foreground dark:hover:bg-white/10 dark:text-zinc-400",
+                ? "bg-secondary text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border))] dark:bg-[#171717] dark:text-zinc-100 dark:shadow-none"
+                : "text-muted-foreground hover:bg-accent/70 hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[0.08]",
             )}
           >
             {activeConversationId === item.id ? <div className="h-5 w-[2px] rounded-full bg-sky-400" /> : <div className="w-[2px]" />}
@@ -342,8 +349,8 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
           className={cn(
             "group flex w-full items-center gap-2 rounded-full px-3 py-2 text-left text-sm transition-colors",
             settingsOpen
-              ? "bg-secondary text-foreground dark:bg-zinc-800/95 dark:text-zinc-100"
-              : "hover:bg-accent/70 text-muted-foreground dark:hover:bg-white/10 dark:text-zinc-400",
+              ? "bg-secondary text-foreground dark:bg-[#171717] dark:text-zinc-100"
+              : "text-muted-foreground hover:bg-accent/70 hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[0.08]",
           )}
           onClick={() => setSettingsOpen((prev) => !prev)}
         >
@@ -352,8 +359,8 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
         </button>
 
         {settingsOpen && expanded ? (
-          <div className="mt-2 rounded-xl bg-secondary/70 p-2 ring-1 ring-border dark:bg-zinc-900/80 dark:ring-zinc-800">
-            <div className="space-y-2 text-xs">
+          <div className="mt-2 rounded-2xl bg-secondary/70 p-2 ring-1 ring-border backdrop-blur dark:bg-zinc-900/80 dark:ring-zinc-800">
+            <div className="flex flex-col gap-2 text-xs">
               <label className="flex items-center justify-between gap-2">
                 <span>昵称</span>
                 <input
@@ -373,11 +380,61 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                   className="w-16 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
                 />
               </label>
-              <div className="space-y-1.5 rounded-md border border-border/60 bg-background/60 p-2 dark:border-zinc-700 dark:bg-zinc-800/50">
+              <div className="flex flex-col gap-2 rounded-xl border border-border/60 bg-background/60 p-2 dark:border-zinc-700 dark:bg-zinc-800/50">
                 <div className="flex items-center justify-between gap-2">
-                  <span>API Key</span>
+                  <span className="inline-flex items-center gap-1 font-medium">
+                    <KeyRound className="h-3.5 w-3.5" />
+                    API 中转站
+                  </span>
                   <span className="text-[11px] text-muted-foreground">{apiKey ? "已配置" : "未配置"}</span>
                 </div>
+                <label className="flex items-center justify-between gap-2">
+                  <span>当前</span>
+                  <select
+                    value={activeApiProfile?.id ?? ""}
+                    onChange={(e) => setActiveApiProfileId(e.target.value)}
+                    className="min-w-0 flex-1 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+                  >
+                    {apiProfiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {activeApiProfile ? (
+                  <>
+                    <label className="flex items-center justify-between gap-2">
+                      <span>名称</span>
+                      <input
+                        type="text"
+                        value={activeApiProfile.name}
+                        onChange={(e) => updateApiProfile(activeApiProfile.id, { name: e.target.value })}
+                        className="min-w-0 flex-1 rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span>Base URL</span>
+                      <input
+                        type="url"
+                        value={activeApiProfile.baseUrl}
+                        placeholder="https://api.example.com"
+                        onChange={(e) => updateApiProfile(activeApiProfile.id, { baseUrl: e.target.value })}
+                        className="w-full rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span>模型预设（逗号分隔，可选）</span>
+                      <input
+                        type="text"
+                        value={activeApiProfile.modelPreset}
+                        placeholder="gpt-4o,gpt-image-1"
+                        onChange={(e) => updateApiProfile(activeApiProfile.id, { modelPreset: e.target.value })}
+                        className="w-full rounded-md bg-background px-2 py-1 ring-1 ring-border dark:bg-zinc-800"
+                      />
+                    </label>
+                  </>
+                ) : null}
                 <Button
                   type="button"
                   size="sm"
@@ -387,6 +444,28 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
                 >
                   {apiKey ? "更换 API Key" : "配置 API Key"}
                 </Button>
+                <div className="flex gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 flex-1 text-xs"
+                    onClick={() => addApiProfile()}
+                  >
+                    <Plus className="mr-1 h-3 w-3" />
+                    新增中转站
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                    disabled={apiProfiles.length <= 1 || !activeApiProfile}
+                    onClick={() => activeApiProfile && deleteApiProfile(activeApiProfile.id)}
+                  >
+                    删除
+                  </Button>
+                </div>
               </div>
               <label className="flex items-center justify-between gap-2">
                 <span>Temperature</span>

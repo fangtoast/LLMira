@@ -11,10 +11,10 @@
  */
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { buildApiMessagesFromChat } from "@/lib/chat/buildMessages";
-import { DEFAULT_STREAM_TIMEOUT_MS, generateImage, streamChatCompletion } from "@/lib/api/client";
+import { DEFAULT_STREAM_TIMEOUT_MS, generateImage, streamChatCompletion, type ApiRequestProfile } from "@/lib/api/client";
 import type { StreamAbortReason } from "@/lib/api/types";
 import { useChatStore } from "@/lib/store/chatStore";
-import { useSettingsStore } from "@/lib/store/settingsStore";
+import { useSettingsStore, type ModelGenerationSettings } from "@/lib/store/settingsStore";
 import { useConversations } from "./useConversations";
 import type { ChatAttachment, ChatMessage, ChatMessageVariant } from "@/types";
 
@@ -23,6 +23,14 @@ function uid() {
 }
 
 type SendPayload = { text: string; attachments?: ChatAttachment[] };
+
+const FALLBACK_MODEL_SETTINGS: ModelGenerationSettings = {
+  temperature: 0.7,
+  topP: 1,
+  maxTokens: 4096,
+  presencePenalty: 0,
+  frequencyPenalty: 0,
+};
 
 function isAbortError(e: unknown): boolean {
   if (e && typeof e === "object" && "name" in e && (e as { name: string }).name === "AbortError") return true;
@@ -41,12 +49,6 @@ function isImageModel(modelName?: string): boolean {
  */
 export function useChat() {
   const {
-    apiKey,
-    activeModel,
-    activeImageModel,
-    generationMode,
-    enableThinking,
-    modelSettingsById,
     userName,
     userAvatarText,
     setApiKeyModalOpen,
@@ -64,18 +66,6 @@ export function useChat() {
     setClientNotice,
   } = useChatStore();
   const { createConversation, saveMessages } = useConversations();
-  const currentModelSettings = useMemo(() => {
-    return (
-      modelSettingsById[activeModel] ?? {
-        temperature: 0.7,
-        topP: 1,
-        maxTokens: 4096,
-        presencePenalty: 0,
-        frequencyPenalty: 0,
-      }
-    );
-  }, [activeModel, modelSettingsById]);
-
   const streamAbortRef = useRef<AbortController | null>(null);
   /** 用户点击停止与切换会话都会 `abort`，用此区分文案。 */
   const streamUserAbortKindRef = useRef<"stop" | "conversation-switch" | null>(null);
@@ -163,9 +153,24 @@ export function useChat() {
       userMessage: ChatMessage;
       content: string;
       attachments: ChatAttachment[];
+      apiProfile: ApiRequestProfile;
+      chatModel: string;
+      chatSettings: ModelGenerationSettings;
+      thinkingEnabled: boolean;
       historyMessages?: ChatMessage[];
     }) => {
-      const { conversationId, assistantId, userMessage, content, attachments, historyMessages } = params;
+      const {
+        conversationId,
+        assistantId,
+        userMessage,
+        content,
+        attachments,
+        apiProfile,
+        chatModel,
+        chatSettings,
+        thinkingEnabled,
+        historyMessages,
+      } = params;
       let acc = "";
       let thinkingAcc = "";
       const history =
@@ -179,15 +184,15 @@ export function useChat() {
       streamAbortRef.current = ac;
 
       await streamChatCompletion(
-        apiKey!,
+        apiProfile,
         {
-          model: activeModel,
-          reasoning_effort: enableThinking ? "high" : undefined,
-          temperature: currentModelSettings.temperature,
-          top_p: currentModelSettings.topP,
-          max_tokens: currentModelSettings.maxTokens,
-          presence_penalty: currentModelSettings.presencePenalty,
-          frequency_penalty: currentModelSettings.frequencyPenalty,
+          model: chatModel,
+          reasoning_effort: thinkingEnabled ? "high" : undefined,
+          temperature: chatSettings.temperature,
+          top_p: chatSettings.topP,
+          max_tokens: chatSettings.maxTokens,
+          presence_penalty: chatSettings.presencePenalty,
+          frequency_penalty: chatSettings.frequencyPenalty,
           messages: apiMessages,
         },
         {
@@ -196,7 +201,7 @@ export function useChat() {
             patchAssistantMessage(conversationId, assistantId, { content: acc });
           },
           onReasoningToken: (token) => {
-            if (!enableThinking) return;
+            if (!thinkingEnabled) return;
             thinkingAcc += token;
             patchAssistantMessage(conversationId, assistantId, { thinkingContent: thinkingAcc });
           },
@@ -241,10 +246,6 @@ export function useChat() {
       );
     },
     [
-      activeModel,
-      apiKey,
-      currentModelSettings,
-      enableThinking,
       patchAssistantMessage,
       saveFinalMessages,
       setLastTokenUsage,
@@ -252,20 +253,21 @@ export function useChat() {
   );
 
   const runImageForAssistant = useCallback(
-    async (params: { conversationId: string; assistantId: string; prompt: string; imageModel: string }) => {
-      const { conversationId, assistantId, prompt, imageModel } = params;
+    async (params: { conversationId: string; assistantId: string; prompt: string; imageModel: string; apiProfile: ApiRequestProfile }) => {
+      const { conversationId, assistantId, prompt, imageModel, apiProfile } = params;
       const ac = new AbortController();
       streamAbortRef.current = ac;
 
       try {
         const images = await generateImage(
-          apiKey!,
+          apiProfile,
           { model: imageModel, prompt: prompt || " ", size: "1024x1024" },
           { signal: ac.signal },
         );
         const text = images.length ? images.map((url) => `![generated](${url})`).join("\n\n") : "未生成图片，请检查模型或配额。";
         updateMessage(conversationId, assistantId, {
           content: text,
+          modelName: imageModel,
           generatedImageUrls: images,
         });
         const list = useChatStore.getState().messagesByConversation[conversationId] ?? [];
@@ -286,7 +288,7 @@ export function useChat() {
         throw error;
       }
     },
-    [apiKey, patchAssistantMessage, saveFinalMessages, updateMessage],
+    [patchAssistantMessage, saveFinalMessages, updateMessage],
   );
 
   const sendMessage = useCallback(
@@ -295,7 +297,16 @@ export function useChat() {
       const attachments = payload.attachments ?? [];
       if (sendLockRef.current) return;
       if (loading) return;
-      if (!apiKey) {
+
+      const settingsSnapshot = useSettingsStore.getState();
+      const apiProfile = settingsSnapshot.getActiveApiProfile();
+      const selectedGenerationMode = settingsSnapshot.generationMode;
+      const selectedChatModel = settingsSnapshot.activeModel;
+      const selectedImageModel = settingsSnapshot.activeImageModel;
+      const selectedThinkingEnabled = settingsSnapshot.enableThinking;
+      const selectedChatSettings = settingsSnapshot.modelSettingsById[selectedChatModel] ?? FALLBACK_MODEL_SETTINGS;
+
+      if (!apiProfile.apiKey) {
         setApiKeyModalOpen(true);
         return;
       }
@@ -307,7 +318,9 @@ export function useChat() {
 
       let conversationId = activeConversationId;
       if (!conversationId) {
-        conversationId = await createConversation(generationMode === "image" ? activeImageModel : activeModel);
+        conversationId = await createConversation(
+          selectedGenerationMode === "image" ? selectedImageModel : selectedChatModel,
+        );
       }
       if (!conversationId) return;
 
@@ -330,7 +343,7 @@ export function useChat() {
         id: assistantId,
         role: "assistant",
         senderName: "Assistant",
-        modelName: generationMode === "image" ? activeImageModel : activeModel,
+        modelName: selectedGenerationMode === "image" ? selectedImageModel : selectedChatModel,
         content: "",
         createdAt: assistantCreatedAt,
       };
@@ -340,12 +353,13 @@ export function useChat() {
       sendLockRef.current = true;
 
       try {
-        if (generationMode === "image") {
+        if (selectedGenerationMode === "image") {
           await runImageForAssistant({
             conversationId,
             assistantId,
             prompt: trimmed,
-            imageModel: activeImageModel,
+            imageModel: selectedImageModel,
+            apiProfile,
           });
         } else {
           await runStreamForAssistant({
@@ -354,6 +368,10 @@ export function useChat() {
             userMessage,
             content: trimmed,
             attachments,
+            apiProfile,
+            chatModel: selectedChatModel,
+            chatSettings: selectedChatSettings,
+            thinkingEnabled: selectedThinkingEnabled,
           });
         }
       } catch (error) {
@@ -373,12 +391,8 @@ export function useChat() {
     },
     [
       activeConversationId,
-      activeImageModel,
-      activeModel,
       addMessage,
-      apiKey,
       createConversation,
-      generationMode,
       loading,
       patchAssistantMessage,
       runStreamForAssistant,
@@ -396,7 +410,13 @@ export function useChat() {
   const regenerateAssistantMessage = useCallback(
     async (assistantMessageId: string) => {
       const convId = activeConversationId;
-      if (!convId || !apiKey) return;
+      if (!convId) return;
+      const settingsSnapshot = useSettingsStore.getState();
+      const apiProfile = settingsSnapshot.getActiveApiProfile();
+      if (!apiProfile.apiKey) {
+        setApiKeyModalOpen(true);
+        return;
+      }
       if (sendLockRef.current || loading) return;
 
       const list = messagesByConversation[convId] ?? [];
@@ -416,6 +436,10 @@ export function useChat() {
       const targetUser = list[userIdx]!;
       const historyMessages = list.slice(0, userIdx);
       const useImageGen = Boolean(targetAssistant.generatedImageUrls?.length) || isImageModel(targetAssistant.modelName);
+      const selectedChatModel = settingsSnapshot.activeModel;
+      const selectedImageModel = settingsSnapshot.activeImageModel;
+      const selectedThinkingEnabled = settingsSnapshot.enableThinking;
+      const selectedChatSettings = settingsSnapshot.modelSettingsById[selectedChatModel] ?? FALLBACK_MODEL_SETTINGS;
 
       const existingVariants: ChatMessageVariant[] = targetAssistant.variants ?? [
         {
@@ -431,7 +455,7 @@ export function useChat() {
         ...targetAssistant,
         content: "",
         thinkingContent: undefined,
-        modelName: useImageGen ? targetAssistant.modelName || activeImageModel : activeModel,
+        modelName: useImageGen ? selectedImageModel : selectedChatModel,
         createdAt: Date.now(),
         variants: existingVariants,
         activeVariantIdx: existingVariants.length,
@@ -449,7 +473,8 @@ export function useChat() {
             conversationId: convId,
             assistantId: assistantMessageId,
             prompt: targetUser.content,
-            imageModel: targetAssistant.modelName || activeImageModel,
+            imageModel: selectedImageModel,
+            apiProfile,
           });
         } else {
           await runStreamForAssistant({
@@ -458,6 +483,10 @@ export function useChat() {
             userMessage: targetUser,
             content: targetUser.content,
             attachments: targetUser.attachments ?? [],
+            apiProfile,
+            chatModel: selectedChatModel,
+            chatSettings: selectedChatSettings,
+            thinkingEnabled: selectedThinkingEnabled,
             historyMessages,
           });
         }
@@ -479,9 +508,6 @@ export function useChat() {
     },
     [
       activeConversationId,
-      activeImageModel,
-      activeModel,
-      apiKey,
       loading,
       messagesByConversation,
       patchAssistantMessage,
@@ -489,18 +515,19 @@ export function useChat() {
       runImageForAssistant,
       runStreamForAssistant,
       saveFinalMessages,
+      setApiKeyModalOpen,
       setLoading,
     ],
   );
 
   const regenerateFromLastUser = useCallback(async () => {
     const convId = activeConversationId;
-    if (!convId || !apiKey) return;
+    if (!convId) return;
     const list = messagesByConversation[convId] ?? [];
     const lastAssistant = [...list].reverse().find((m) => m.role === "assistant");
     if (!lastAssistant) return;
     await regenerateAssistantMessage(lastAssistant.id);
-  }, [activeConversationId, apiKey, messagesByConversation, regenerateAssistantMessage]);
+  }, [activeConversationId, messagesByConversation, regenerateAssistantMessage]);
 
   const setAssistantActiveVariant = useCallback(
     async (assistantMessageId: string, variantIdx: number) => {
@@ -527,7 +554,13 @@ export function useChat() {
   const editUserMessageAndResend = useCallback(
     async (messageId: string, newContent: string) => {
       const convId = activeConversationId;
-      if (!convId || !apiKey) return;
+      if (!convId) return;
+      const settingsSnapshot = useSettingsStore.getState();
+      const apiProfile = settingsSnapshot.getActiveApiProfile();
+      if (!apiProfile.apiKey) {
+        setApiKeyModalOpen(true);
+        return;
+      }
       if (sendLockRef.current || loading) return;
       const list = messagesByConversation[convId] ?? [];
       const idx = list.findIndex((m) => m.id === messageId);
@@ -535,12 +568,17 @@ export function useChat() {
       const cut = list.slice(0, idx);
       const updatedUser: ChatMessage = { ...list[idx]!, content: newContent };
       const assistantId = uid();
-      const useImageGen = generationMode === "image";
+      const selectedGenerationMode = settingsSnapshot.generationMode;
+      const selectedChatModel = settingsSnapshot.activeModel;
+      const selectedImageModel = settingsSnapshot.activeImageModel;
+      const selectedThinkingEnabled = settingsSnapshot.enableThinking;
+      const selectedChatSettings = settingsSnapshot.modelSettingsById[selectedChatModel] ?? FALLBACK_MODEL_SETTINGS;
+      const useImageGen = selectedGenerationMode === "image";
       const assistantMessage: ChatMessage = {
         id: assistantId,
         role: "assistant",
         senderName: "Assistant",
-        modelName: useImageGen ? activeImageModel : activeModel,
+        modelName: useImageGen ? selectedImageModel : selectedChatModel,
         content: "",
         createdAt: Date.now(),
       };
@@ -555,7 +593,8 @@ export function useChat() {
             conversationId: convId,
             assistantId,
             prompt: newContent,
-            imageModel: activeImageModel,
+            imageModel: selectedImageModel,
+            apiProfile,
           });
         } else {
           await runStreamForAssistant({
@@ -564,6 +603,10 @@ export function useChat() {
             userMessage: updatedUser,
             content: newContent,
             attachments: updatedUser.attachments ?? [],
+            apiProfile,
+            chatModel: selectedChatModel,
+            chatSettings: selectedChatSettings,
+            thinkingEnabled: selectedThinkingEnabled,
           });
         }
       } catch (error) {
@@ -584,10 +627,6 @@ export function useChat() {
     },
     [
       activeConversationId,
-      activeImageModel,
-      activeModel,
-      apiKey,
-      generationMode,
       loading,
       messagesByConversation,
       patchAssistantMessage,
@@ -595,6 +634,7 @@ export function useChat() {
       runImageForAssistant,
       runStreamForAssistant,
       saveFinalMessages,
+      setApiKeyModalOpen,
       setLoading,
     ],
   );

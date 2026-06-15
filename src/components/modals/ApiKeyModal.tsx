@@ -17,8 +17,9 @@ import { useSettingsStore } from "@/lib/store/settingsStore";
 
 /** 全局 API Key 配置对话框（受 store 的 `apiKeyModalOpen` 控制）。 */
 export function ApiKeyModal() {
-  const { apiKey, apiKeyModalOpen, setApiKeyModalOpen, setApiKey } = useSettingsStore();
+  const { apiKey, apiKeyModalOpen, apiProfiles, activeApiProfileId, setApiKeyModalOpen, setApiKey } = useSettingsStore();
   const [value, setValue] = useState("");
+  const activeProfile = apiProfiles.find((item) => item.id === activeApiProfileId) ?? apiProfiles[0];
 
   useEffect(() => {
     if (apiKeyModalOpen) {
@@ -29,10 +30,10 @@ export function ApiKeyModal() {
   return (
     <Dialog open={apiKeyModalOpen} onOpenChange={setApiKeyModalOpen}>
       <DialogContent>
-        <h2 className="mb-3 text-lg font-semibold">{apiKey ? "更换 API Key" : "配置 API Key"}</h2>
+        <h2 className="mb-1 text-lg font-semibold">{apiKey ? "更换 API Key" : "配置 API Key"}</h2>
+        <p className="mb-3 text-xs text-muted-foreground">当前中转站：{activeProfile?.name ?? "默认"}</p>
         <p className="mb-4 text-sm text-muted-foreground">
-          在所用 API 服务商控制台创建令牌后填入。接口地址由环境变量 <code className="text-xs">NEXT_PUBLIC_API_BASE_URL</code>{" "}
-          决定（未配置时默认慧言）。
+          在所用 API 服务商控制台创建令牌后填入。接口地址可在侧栏设置的 API 中转站里切换。
         </p>
         <Input
           value={value}

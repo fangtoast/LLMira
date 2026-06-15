@@ -220,8 +220,8 @@ export function InputBar({
       }}
     >
       <div
-        className={`mx-auto w-full min-w-0 max-w-3xl rounded-2xl border border-slate-200/80 bg-white/85 p-3 backdrop-blur-md transition-all duration-200 shadow-[0_12px_28px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-white/5 dark:shadow-[0_12px_28px_rgba(0,0,0,0.28)] sm:rounded-[32px] ${
-          dragActive ? "shadow-[0_0_0_1px_rgba(59,130,246,0.55)]" : "shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
+        className={`llmira-soft-pop mx-auto w-full min-w-0 max-w-4xl rounded-[28px] border border-slate-200/80 bg-white/90 p-3 backdrop-blur-xl transition-all duration-300 shadow-[0_16px_42px_rgba(15,23,42,0.14)] hover:shadow-[0_20px_50px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-[#242424]/95 dark:shadow-[0_18px_48px_rgba(0,0,0,0.34)] sm:rounded-[36px] ${
+          dragActive ? "scale-[1.01] ring-2 ring-primary/40" : ""
         }`}
       >
         {attachments.length > 0 && (
@@ -291,15 +291,15 @@ export function InputBar({
                 void submit();
               }
             }}
-            placeholder="输入你的问题...（可粘贴/拖入附件；不支持的格式会在附件上标注，悬停可看说明；Enter 发送，Shift+Enter 换行）"
-            className="min-h-[2.75rem] max-h-48 rounded-2xl border-none bg-transparent leading-relaxed text-slate-900 ring-0 focus-visible:ring-0 dark:text-zinc-100"
+            placeholder={generationMode === "image" ? "描述你想生成的画面..." : "有问题，尽管问"}
+            className="min-h-[2.75rem] max-h-48 rounded-2xl border-none bg-transparent text-base leading-relaxed text-slate-900 ring-0 placeholder:text-slate-400 focus-visible:ring-0 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
           {loading ? (
             <Button
               type="button"
               onClick={onStop}
               size="icon"
-              className="h-9 w-9 shrink-0 rounded-full bg-destructive/90 text-destructive-foreground transition-all duration-200 hover:scale-105"
+              className="h-10 w-10 shrink-0 rounded-full bg-destructive/90 text-destructive-foreground transition-all duration-200 hover:scale-105"
               aria-label="停止生成"
             >
               <Square className="h-4 w-4 fill-current" />
@@ -309,13 +309,13 @@ export function InputBar({
               onClick={() => void submit()}
               size="icon"
               disabled={hasReadingAttachments}
-              className="h-9 w-9 shrink-0 rounded-full bg-slate-200 text-slate-600 transition-all duration-200 hover:scale-105 hover:bg-primary hover:text-primary-foreground dark:bg-white/10 dark:text-zinc-300"
+              className="h-10 w-10 shrink-0 rounded-full bg-slate-200 text-slate-600 transition-all duration-200 hover:-translate-y-0.5 hover:scale-105 hover:bg-primary hover:text-primary-foreground dark:bg-white dark:text-zinc-950"
             >
               <ArrowUp className="h-4 w-4" />
             </Button>
           )}
         </div>
-        <div className="mt-1 flex items-center justify-between px-1 text-xs text-slate-500 dark:text-zinc-500">
+        <div className="mt-1 flex items-center justify-between px-2 text-xs text-slate-500 dark:text-zinc-500">
           <span>
             {value.length}/{INPUT_MAX}
           </span>

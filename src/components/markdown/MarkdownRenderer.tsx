@@ -13,6 +13,7 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { CodeBlock } from "./CodeBlock";
+import { LinkPreviewAnchor } from "./LinkPreviewAnchor";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -69,6 +70,14 @@ export function MarkdownRenderer({ content, className }: Props) {
             const value = String(children).replace(/\n$/, "");
             if (match) return <CodeBlock code={value} language={match[1]} />;
             return <code className="rounded bg-muted px-1 py-0.5">{children}</code>;
+          },
+          a(props) {
+            const { children, href, className, ...rest } = props;
+            return (
+              <LinkPreviewAnchor href={href} className={className} {...rest}>
+                {children}
+              </LinkPreviewAnchor>
+            );
           },
         }}
       >

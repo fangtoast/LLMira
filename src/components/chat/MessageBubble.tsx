@@ -201,7 +201,7 @@ function MessageBubbleImpl({
       )}
     >
       {isUser ? (
-        <div className="flex max-w-[min(100%,32rem)] flex-col items-end gap-1.5">
+        <div className="flex max-w-[min(100%,34rem)] flex-col items-end gap-1.5">
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <span className="font-medium tracking-tight">{message.senderName?.trim() || "Xiao"}</span>
             <span
@@ -213,8 +213,8 @@ function MessageBubbleImpl({
           </div>
           <div
             className={cn(
-              "w-full rounded-2xl border border-border/50 bg-card/90 px-4 py-2.5 text-foreground",
-              "shadow-sm dark:border-white/10 dark:bg-zinc-800/70",
+              "w-full rounded-[1.35rem] border border-border/40 bg-card/90 px-4 py-2.5 text-foreground transition-shadow",
+              "shadow-sm hover:shadow-md dark:border-white/10 dark:bg-[#2f2f2f]",
             )}
           >
             <MarkdownRenderer
@@ -244,13 +244,13 @@ function MessageBubbleImpl({
       ) : (
         <div className="flex w-full max-w-full flex-1 justify-start gap-3">
           <div
-            className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary ring-1 ring-primary/20"
+            className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary ring-1 ring-primary/20"
             aria-hidden
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={BRAND_ICON_PATH} alt={BRAND_NAME} className="h-4 w-4 rounded-full object-cover" />
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 rounded-2xl px-1 py-0.5 transition-colors group-hover/msg:bg-card/25 sm:px-2 dark:group-hover/msg:bg-white/[0.025]">
             <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
               <span className="font-medium text-foreground/90">{message.senderName ?? "Assistant"}</span>
               {displayModelName ? (
@@ -292,7 +292,7 @@ function MessageBubbleImpl({
               {answerContent ? (
                 <MarkdownRenderer
                   content={answerContent}
-                  className="prose-headings:mb-2 prose-headings:mt-4 prose-p:my-2 prose-p:leading-7 first:prose-p:mt-0 prose-li:my-0.5 text-[0.9375rem] leading-7 text-foreground/95"
+                  className="prose-headings:mb-2 prose-headings:mt-4 prose-p:my-2 prose-p:leading-8 first:prose-p:mt-0 prose-li:my-1 text-[1rem] leading-8 text-foreground/95"
                 />
               ) : null}
             </div>
@@ -308,7 +308,7 @@ function MessageBubbleImpl({
             ) : null}
 
             {/* 底部操作栏 */}
-            <div className="mt-2 flex items-center gap-0.5 opacity-0 transition group-hover/msg:opacity-100">
+            <div className="mt-2 flex items-center gap-0.5 opacity-0 transition duration-200 group-hover/msg:opacity-100 group-focus-within/msg:opacity-100">
               {totalVariants > 1 ? (
                 <>
                   <Button

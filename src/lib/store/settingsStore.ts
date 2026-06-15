@@ -12,6 +12,9 @@
 import { create } from "zustand";
 import { createJSONStorage, type StateStorage, persist } from "zustand/middleware";
 
+const DEFAULT_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
+const DEFAULT_API_PROFILE_ID = "default";
+
 const memoryStorage: StateStorage = {
   getItem: () => null,
   setItem: () => undefined,
@@ -54,6 +57,14 @@ export type ModelGenerationSettings = {
   frequencyPenalty: number;
 };
 
+export type ApiProfile = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  modelPreset: string;
+};
+
 const DEFAULT_MODEL_GENERATION_SETTINGS: ModelGenerationSettings = {
   temperature: 0.7,
   topP: 1,
@@ -65,6 +76,49 @@ const DEFAULT_MODEL_GENERATION_SETTINGS: ModelGenerationSettings = {
 function clampNumber(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
+}
+
+export function normalizeApiBaseUrl(value: string) {
+  const trimmed = value.trim();
+  const withoutTrailingSlash = trimmed.replace(/\/+$/g, "");
+  return withoutTrailingSlash.replace(/\/v1$/i, "") || DEFAULT_API_BASE_URL;
+}
+
+function createDefaultApiProfile(apiKey = ""): ApiProfile {
+  return {
+    id: DEFAULT_API_PROFILE_ID,
+    name: "慧言默认",
+    baseUrl: normalizeApiBaseUrl(DEFAULT_API_BASE_URL),
+    apiKey,
+    modelPreset: process.env.NEXT_PUBLIC_MODEL_PRESET ?? "",
+  };
+}
+
+function createApiProfileId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `profile-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function sanitizeApiProfile(input: Partial<ApiProfile> | undefined, fallbackApiKey = ""): ApiProfile {
+  const fallback = createDefaultApiProfile(fallbackApiKey);
+  return {
+    id: input?.id?.trim() || fallback.id,
+    name: input?.name?.trim() || fallback.name,
+    baseUrl: normalizeApiBaseUrl(input?.baseUrl ?? fallback.baseUrl),
+    apiKey: input?.apiKey ?? fallback.apiKey,
+    modelPreset: input?.modelPreset ?? fallback.modelPreset,
+  };
+}
+
+function parsePresetModels(raw: string): string[] {
+  return [
+    ...new Set(
+      raw
+        .split(/[,，\n]/g)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function sanitizeModelSettings(input: Partial<ModelGenerationSettings>): ModelGenerationSettings {
@@ -79,6 +133,8 @@ function sanitizeModelSettings(input: Partial<ModelGenerationSettings>): ModelGe
 
 interface SettingsState {
   apiKey: string;
+  apiProfiles: ApiProfile[];
+  activeApiProfileId: string;
   userName: string;
   userAvatarText: string;
   activeModel: string;
@@ -95,6 +151,12 @@ interface SettingsState {
   apiKeyModalOpen: boolean;
   hasCompletedOnboarding: boolean;
   setApiKey: (key: string) => void;
+  setActiveApiProfileId: (profileId: string) => void;
+  addApiProfile: () => string;
+  updateApiProfile: (profileId: string, patch: Partial<Omit<ApiProfile, "id">>) => void;
+  deleteApiProfile: (profileId: string) => void;
+  getActiveApiProfile: () => ApiProfile;
+  getActiveProfilePresetModels: () => string[];
   setUserName: (name: string) => void;
   setUserAvatarText: (text: string) => void;
   setActiveModel: (model: string) => void;
@@ -117,8 +179,10 @@ interface SettingsState {
 /** 用户级设置（含密钥与模型选择），详见 `partialize` 持久化字段。 */
 export const useSettingsStore = create<SettingsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       apiKey: "",
+      apiProfiles: [createDefaultApiProfile()],
+      activeApiProfileId: DEFAULT_API_PROFILE_ID,
       userName: "Xiao",
       userAvatarText: "潇",
       activeModel: "gpt-5.5",
@@ -132,7 +196,92 @@ export const useSettingsStore = create<SettingsState>()(
       sidebarCollapsed: false,
       apiKeyModalOpen: false,
       hasCompletedOnboarding: false,
-      setApiKey: (apiKey) => set({ apiKey }),
+      setApiKey: (apiKey) =>
+        set((state) => {
+          const activeId = state.activeApiProfileId || state.apiProfiles[0]?.id || DEFAULT_API_PROFILE_ID;
+          const profiles = state.apiProfiles.length ? state.apiProfiles : [createDefaultApiProfile()];
+          return {
+            apiKey,
+            activeApiProfileId: activeId,
+            apiProfiles: profiles.map((profile, idx) =>
+              profile.id === activeId || (!profiles.some((item) => item.id === activeId) && idx === 0)
+                ? { ...profile, apiKey }
+                : profile,
+            ),
+          };
+        }),
+      setActiveApiProfileId: (activeApiProfileId) =>
+        set((state) => {
+          const profile = state.apiProfiles.find((item) => item.id === activeApiProfileId) ?? state.apiProfiles[0];
+          if (!profile) return state;
+          return {
+            activeApiProfileId: profile.id,
+            apiKey: profile.apiKey,
+          };
+        }),
+      addApiProfile: () => {
+        const id = createApiProfileId();
+        set((state) => {
+          const profile: ApiProfile = {
+            id,
+            name: `中转站 ${state.apiProfiles.length + 1}`,
+            baseUrl: normalizeApiBaseUrl(DEFAULT_API_BASE_URL),
+            apiKey: "",
+            modelPreset: "",
+          };
+          return {
+            apiProfiles: [...state.apiProfiles, profile],
+            activeApiProfileId: id,
+            apiKey: "",
+          };
+        });
+        return id;
+      },
+      updateApiProfile: (profileId, patch) =>
+        set((state) => {
+          const profiles = state.apiProfiles.length ? state.apiProfiles : [createDefaultApiProfile(state.apiKey)];
+          const nextProfiles = profiles.map((profile) => {
+            if (profile.id !== profileId) return profile;
+            return sanitizeApiProfile(
+              {
+                ...profile,
+                ...patch,
+                baseUrl: patch.baseUrl !== undefined ? normalizeApiBaseUrl(patch.baseUrl) : profile.baseUrl,
+              },
+              state.apiKey,
+            );
+          });
+          const active = nextProfiles.find((profile) => profile.id === state.activeApiProfileId) ?? nextProfiles[0]!;
+          return {
+            apiProfiles: nextProfiles,
+            activeApiProfileId: active.id,
+            apiKey: active.apiKey,
+          };
+        }),
+      deleteApiProfile: (profileId) =>
+        set((state) => {
+          const profiles = state.apiProfiles.length ? state.apiProfiles : [createDefaultApiProfile(state.apiKey)];
+          if (profiles.length <= 1) return state;
+          const nextProfiles = profiles.filter((profile) => profile.id !== profileId);
+          const active =
+            state.activeApiProfileId === profileId
+              ? nextProfiles[0]!
+              : nextProfiles.find((profile) => profile.id === state.activeApiProfileId) ?? nextProfiles[0]!;
+          return {
+            apiProfiles: nextProfiles,
+            activeApiProfileId: active.id,
+            apiKey: active.apiKey,
+          };
+        }),
+      getActiveApiProfile: () => {
+        const state = get();
+        return (
+          state.apiProfiles.find((profile) => profile.id === state.activeApiProfileId) ??
+          state.apiProfiles[0] ??
+          createDefaultApiProfile(state.apiKey)
+        );
+      },
+      getActiveProfilePresetModels: () => parsePresetModels(get().getActiveApiProfile().modelPreset),
       /** 允许空字符串，便于在输入框中删除后重新输入；界面展示处再用默认值兜底 */
       setUserName: (userName) => set({ userName }),
       setUserAvatarText: (userAvatarText) => set({ userAvatarText: userAvatarText.slice(0, 2) }),
@@ -253,9 +402,28 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "huiyan-settings",
+      version: 2,
       storage,
+      migrate: (persisted) => {
+        const data = (persisted ?? {}) as Partial<SettingsState> & { apiKey?: string };
+        const profiles =
+          Array.isArray(data.apiProfiles) && data.apiProfiles.length
+            ? data.apiProfiles.map((profile) => sanitizeApiProfile(profile, data.apiKey ?? ""))
+            : [createDefaultApiProfile(data.apiKey ?? "")];
+        const active =
+          profiles.find((profile) => profile.id === data.activeApiProfileId) ??
+          profiles[0]!;
+        return {
+          ...data,
+          apiProfiles: profiles,
+          activeApiProfileId: active.id,
+          apiKey: active.apiKey,
+        };
+      },
       partialize: (state) => ({
         apiKey: state.apiKey,
+        apiProfiles: state.apiProfiles,
+        activeApiProfileId: state.activeApiProfileId,
         userName: state.userName,
         userAvatarText: state.userAvatarText,
         activeModel: state.activeModel,

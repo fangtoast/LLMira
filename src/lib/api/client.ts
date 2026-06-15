@@ -20,7 +20,17 @@ import type {
 } from "./types";
 import { MissingApiKeyError } from "./types";
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
+const fallbackBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
+
+export type ApiRequestProfile = {
+  apiKey: string;
+  baseUrl: string;
+};
+
+function normalizeBaseUrl(baseUrl?: string) {
+  const raw = (baseUrl || fallbackBaseUrl).trim();
+  return raw.replace(/\/+$/g, "").replace(/\/v1$/i, "") || fallbackBaseUrl;
+}
 
 async function readErrorText(response: Response, maxLen = 500) {
   try {
@@ -71,9 +81,9 @@ function getHeaders(apiKey: string) {
  *
  * @throws Error 当 HTTP 非成功或 JSON 非法时
  */
-export async function fetchModels(apiKey: string): Promise<string[]> {
-  const res = await fetch(`${baseUrl}/v1/models`, {
-    headers: getHeaders(apiKey),
+export async function fetchModels(profile: ApiRequestProfile): Promise<string[]> {
+  const res = await fetch(`${normalizeBaseUrl(profile.baseUrl)}/v1/models`, {
+    headers: getHeaders(profile.apiKey),
   });
   if (!res.ok) {
     const detail = await readErrorText(res);
@@ -179,7 +189,7 @@ function resolveStreamAbortReason(
  * @remarks 中止时触发 `onAbort`；非中止错误向上抛出，由调用方处理。
  */
 export async function streamChatCompletion(
-  apiKey: string,
+  profile: ApiRequestProfile,
   payload: ChatCompletionRequest,
   callbacks: StreamCallbacks,
   options?: StreamRequestOptions,
@@ -192,9 +202,9 @@ export async function streamChatCompletion(
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
   try {
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
+    const response = await fetch(`${normalizeBaseUrl(profile.baseUrl)}/v1/chat/completions`, {
       method: "POST",
-      headers: getHeaders(apiKey),
+      headers: getHeaders(profile.apiKey),
       body: JSON.stringify({ ...payload, stream: true }),
       signal: requestSignal,
     });
@@ -281,16 +291,16 @@ export async function streamChatCompletion(
  * POST `/v1/images/generations`，返回图片 URL 列表（含 content 中解析的链接兜底）。
  */
 export async function generateImage(
-  apiKey: string,
+  profile: ApiRequestProfile,
   payload: ImageGenerationRequest,
   options?: StreamRequestOptions,
 ): Promise<string[]> {
   const startedAt = performance.now();
   const { requestSignal } = createRequestSignalWithTimeout(options?.signal, DEFAULT_SHORT_REQUEST_TIMEOUT_MS);
   logger.info({ model: payload.model }, "[Request Model]");
-  const response = await fetch(`${baseUrl}/v1/images/generations`, {
+  const response = await fetch(`${normalizeBaseUrl(profile.baseUrl)}/v1/images/generations`, {
     method: "POST",
-    headers: getHeaders(apiKey),
+    headers: getHeaders(profile.apiKey),
     body: JSON.stringify(payload),
     signal: requestSignal,
   });

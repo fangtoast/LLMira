@@ -46,7 +46,6 @@
 body {
   @apply bg-background text-foreground antialiased leading-relaxed;
   background-color: #0a0a0a;
-  background-image: radial-gradient(circle at 18% 12%, #121212 0%, #0a0a0a 58%);
   padding-top: env(safe-area-inset-top, 0);
   padding-left: env(safe-area-inset-left, 0);
   padding-right: env(safe-area-inset-right, 0);
@@ -54,5 +53,70 @@ body {
 
 .dark body {
   background-color: #0a0a0a;
-  background-image: radial-gradient(circle at 18% 12%, #121212 0%, #0a0a0a 58%);
+}
+
+::selection {
+  background: hsl(var(--primary) / 0.28);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
+}
+
+*::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.34);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+.llmira-message-enter {
+  animation: llmira-message-enter 220ms ease-out both;
+}
+
+.llmira-soft-pop {
+  animation: llmira-soft-pop 180ms ease-out both;
+}
+
+@keyframes llmira-message-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes llmira-soft-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
