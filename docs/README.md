@@ -1,11 +1,11 @@
 <!--
-  Purpose: LLMira 团队版文档入口
+  Purpose: LLMira 个人工作台与可选团队能力的文档入口
   Author: fangtoast <fangtoast@foxmail.com>
 -->
 
 # LLMira 文档索引
 
-这里记录团队版的稳定架构、部署、安全和发布约定。旧版本地聊天模块仍留在源码中用于迁移兼容，其旧文档不再代表首发产品边界。
+这里记录 LLMira 个人工作台、可选团队协作、部署、安全和发布约定。旧版本地聊天模块仍留在源码中用于迁移兼容，其旧文档不再代表当前产品边界。
 
 ## 当前文档
 
@@ -15,6 +15,7 @@
 | [API 与安全边界](API与安全边界.md) | `/api/v1`、SSE、角色、密钥、MCP、SSRF 与审计 |
 | [部署与恢复](部署与恢复.md) | Docker Compose、TLS、备份、恢复演练与健康检查 |
 | [发布与打包](发布与打包.md) | Web、Windows x64、Android arm64 和签名前置条件 |
+| [开发版说明](开发版说明.md) | 普通用户下载、安装、校验与 Developer Preview 已知边界 |
 | [贡献指南](engineering/CONTRIBUTING.md) | 代码、日志、文件头、测试与提交规则 |
 
 ## 兼容资料

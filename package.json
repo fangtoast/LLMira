@@ -10,6 +10,9 @@
     "apps/*",
     "packages/*"
   ],
+  "overrides": {
+    "brace-expansion@1": "1.1.18"
+  },
   "scripts": {
     "build:packages": "npm run build --workspace @llmira/contracts && npm run build --workspace @llmira/security",
     "predev": "npm run build:packages",

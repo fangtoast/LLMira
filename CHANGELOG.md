@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+### Documentation
+
+- 恢复 `LLM + Mira` 的命名典故，并将 README 调整为个人工作台优先、团队协作后置。
+- 增加真实桌面/Android 截图、功能对应说明、个人使用指南与开发版安装说明。
+
+### Release
+
+- 统一 Windows x64 与 Android arm64 的标签构建，在同一个 GitHub Prerelease 发布安装包和 SHA-256 校验文件。
+- 将 CI 依赖下载统一切换到 npm 官方 Registry，并升级 GitHub 官方基础 Actions，修复远端 `npm ci` 门禁。
+
 ### Added
 
 - 侧栏「设置」中增加 API Key 配置入口，可随时打开弹窗更换密钥（与发消息时缺失 Key 的弹窗共用）。

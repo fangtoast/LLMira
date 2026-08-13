@@ -1,3 +1,5 @@
+# Purpose: Validate the web client, services, integrations, and Tauri shell.
+# Author: fangtoast <fangtoast@foxmail.com>
 name: quality
 
 on:
@@ -12,12 +14,13 @@ jobs:
   web-and-services:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm install --global npm@11.6.0
+      - run: npm ci --registry=https://registry.npmjs.org
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
@@ -36,12 +39,13 @@ jobs:
       MINIO_ROOT_PASSWORD: integration-object-password
       TEST_DATABASE_URL: postgres://llmira:integration-password@localhost:5432/llmira
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm install --global npm@11.6.0
+      - run: npm ci --registry=https://registry.npmjs.org
       - run: npm run build:packages
       - run: docker compose up -d postgres redis minio minio-create-bucket
       - run: docker compose ps
@@ -52,6 +56,6 @@ jobs:
   rust:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo check --manifest-path src-tauri/Cargo.toml
