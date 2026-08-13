@@ -2,11 +2,11 @@
  * @project LLMira
  * @file src/app/chat/page.tsx
  * @author fangtoast <fangtoast@foxmail.com>
- * @date 2026-04-30
- * @description 对话主界面，装配 `MainLayout`。
+ * @date 2026-08-13
+ * @description 保留旧书签兼容，并进入新的团队工作台。
  */
-import { MainLayout } from "@/components/layout/MainLayout";
+import { TeamPortal } from "@/components/team/TeamPortal";
 
 export default function ChatPage() {
-  return <MainLayout />;
+  return <TeamPortal />;
 }

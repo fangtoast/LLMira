@@ -2,7 +2,7 @@
  * @project LLMira
  * @file src/components/ui/button.tsx
  * @author fangtoast <fangtoast@foxmail.com>
- * @date 2026-04-30
+ * @date 2026-08-13
  * @description Radix Slot + cva 变体按钮（shadcn 风格封装）。
  */
 import * as React from "react";
@@ -11,17 +11,19 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
         outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         ghost: "hover:bg-accent hover:text-accent-foreground",
+        approval: "bg-warning text-warning-foreground hover:bg-warning/90",
       },
       size: {
         default: "h-10 px-4 py-2",
         sm: "h-9 rounded-md px-3",
+        xs: "h-8 rounded-md px-2.5 text-xs",
         icon: "h-10 w-10",
       },
     },

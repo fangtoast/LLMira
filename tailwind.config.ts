@@ -44,6 +44,23 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        workbench: {
+          rail: "hsl(var(--workbench-rail))",
+          panel: "hsl(var(--workbench-panel))",
+          canvas: "hsl(var(--workbench-canvas))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

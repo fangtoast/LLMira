@@ -1,21 +1,18 @@
-FROM node:20-alpine AS deps
+FROM node:24-bookworm-slim AS builder
 WORKDIR /app
-COPY package*.json ./
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/worker/package.json apps/worker/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/security/package.json packages/security/package.json
 RUN npm ci
-
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ARG NEXT_PUBLIC_TEAM_API_URL=""
+ENV NEXT_PUBLIC_TEAM_API_URL=${NEXT_PUBLIC_TEAM_API_URL}
 RUN npm run build
 
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-ENV PORT=3000
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-EXPOSE 3000
-CMD ["npm", "run", "start"]
+FROM caddy:2.10-alpine
+COPY infra/caddy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=builder /app/out /srv
+EXPOSE 80 443
+HEALTHCHECK --interval=20s --timeout=5s --retries=5 CMD wget -q -O /dev/null http://127.0.0.1/ || exit 1

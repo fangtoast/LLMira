@@ -5,7 +5,7 @@ alwaysApply: true
 
 # 工程化准则（LLMira）
 
-与 [`AGENTS.md`](AGENTS.md) 中的 Next.js 说明互补：本规则侧重 **Git、日志、注释、文档**；实现 Next 功能时仍须遵守 `AGENTS.md` 中关于 Next 14 的约束。
+与 [`AGENTS.md`](AGENTS.md) 中的 Next.js 说明互补：本规则侧重 **Git、日志、注释、文档**；实现 Next 功能时须先查阅当前安装版本 `node_modules/next/dist/docs/`，不得沿用旧版本惯例。
 
 ## Git 与提交
 

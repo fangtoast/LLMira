@@ -1,0 +1,57 @@
+name: quality
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  web-and-services:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run test --workspace @llmira/api
+      - run: npm run test --workspace @llmira/worker
+      - run: npm run build:workspaces
+      - run: npm run build
+      - run: npm run check:bundle
+
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      ENCRYPTION_MASTER_KEY: integration-only-master-key-change-in-production
+      JWT_SECRET: integration-only-jwt-secret-at-least-32-characters
+      POSTGRES_PASSWORD: integration-password
+      MINIO_ROOT_PASSWORD: integration-object-password
+      TEST_DATABASE_URL: postgres://llmira:integration-password@localhost:5432/llmira
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build:packages
+      - run: docker compose up -d postgres redis minio minio-create-bucket
+      - run: docker compose ps
+      - run: npm run test --workspace @llmira/api
+      - if: always()
+        run: docker compose down -v
+
+  rust:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo check --manifest-path src-tauri/Cargo.toml

@@ -1,0 +1,24 @@
+{$LLMIRA_SITE_ADDRESS:http://localhost} {
+  encode zstd gzip
+
+  handle /api/* {
+    reverse_proxy api:4000
+  }
+
+  handle /v1/* {
+    reverse_proxy api:4000
+  }
+
+  handle {
+    root * /srv
+    try_files {path} {path}/ /index.html
+    file_server
+  }
+
+  header {
+    -Server
+    X-Content-Type-Options nosniff
+    Referrer-Policy strict-origin-when-cross-origin
+    Permissions-Policy "camera=(), geolocation=(), payment=()"
+  }
+}

@@ -83,7 +83,6 @@ function emit(level: LogLevelName, args: unknown[]): void {
     Object.assign(payload, parsed.context);
   }
 
-  /* eslint-disable no-console -- 本模块为唯一允许的 console 汇聚点 */
   if (isProduction()) {
     const line = JSON.stringify(payload);
     switch (level) {
