@@ -2,7 +2,7 @@
 
 ## 功能描述
 
-会话列表与消息保存在浏览器 **IndexedDB**（Dexie 封装）。应用启动时通过 **`bootstrapSessionFromIndexedDb`**（`src/lib/chat/bootstrapSession.ts`）一次性从 IndexedDB 拉取会话列表、恢复**上次打开的会话**（`localStorage` 键 `llmira-last-conversation-id`，见 `lastConversationStorage.ts`），并加载该会话消息；刷新后列表与当前会话应与刷新前一致。侧栏支持单会话 JSON / Markdown / 文本导出与 JSON 导入；另支持 **全量备份 JSON**（多会话，`exportImport` 中 `version: 2`）与合并 / 替换导入。
+会话、消息与新产生的个人用量事件保存在浏览器 **IndexedDB**（Dexie 封装）。应用启动时通过 **`bootstrapSessionFromIndexedDb`**（`src/lib/chat/bootstrapSession.ts`）一次性从 IndexedDB 拉取会话列表、恢复**上次打开的会话**（`localStorage` 键 `llmira-last-conversation-id`，见 `lastConversationStorage.ts`），并加载该会话消息；刷新后列表与当前会话应与刷新前一致。侧栏支持单会话 JSON / Markdown / 文本导出与 JSON 导入；另支持 **version 4 全量备份 JSON**，并继续接受 version 2/3。
 
 ## 同源、主机与端口（为何「换地址就像没了对话」）
 
@@ -23,11 +23,11 @@ IndexedDB 与 `localStorage` 均绑定浏览器的**源（origin）**：**协议
 | `db` | `src/lib/db/dexie.ts` 导出，数据库名 `llmira-db` |
 | `bootstrapSessionFromIndexedDb` | 启动引导：列表 + 上次会话 + 消息；结束前将 store `hydrated` 置为 `true` |
 | `useConversations()` | `loadMessages`、`saveMessages`、`createConversation`、`deleteConversation`、`exportFullBackupDownload`、`importFullBackupMerge` / `Replace` 等 |
-| `exportImport` | `src/lib/chat/exportImport.ts`：单会话 `version: 1`；全量备份 `FULL_BACKUP_VERSION === 2` |
+| `exportImport` | `src/lib/chat/exportImport.ts`：单会话 `version: 1`；全量备份 `FULL_BACKUP_VERSION === 4` |
 
 ## 参数说明
 
-- **表**：`conversations`（含可选 `keyword` 用于搜索）、`messages`（每条含 `conversationId`）。
+- **表**：`conversations`（含可选 `keyword` 用于搜索）、`messages`（每条含 `conversationId`）、`usageEvents`（按时间、Provider、模型、功能和状态索引）。
 - **排序**：加载时按 `createdAt` 升序，同毫秒再以 `id` 稳定排序（见 `useConversations.loadMessages`）。
 - **`hydrated`**：`chatStore` 中标明 IndexedDB 引导是否完成；引导完成前 UI 可显示占位，避免空白欢迎页闪烁。
 
@@ -36,7 +36,9 @@ IndexedDB 与 `localStorage` 均绑定浏览器的**源（origin）**：**协议
 - **导出**：侧栏「全量备份」从 IndexedDB 读取**全部**会话与消息写入单个 JSON（与仅导出当前内存中已加载消息不同）。
 - **导入**：选择「导入全量」后：
   - **合并**：为备份内每个会话生成新 id，追加到现有库，保留本地已有会话；
-  - **替换**：清空本地 `conversations` / `messages` 后按备份写回，随后重新执行引导（与刷新后状态一致）。
+  - **替换**：清空本地 `conversations` / `messages` / `usageEvents` 后按备份写回，随后重新执行引导（与刷新后状态一致）。
+
+用量账本不保存提示词、搜索词、MCP 参数/结果、API Key、环境变量或请求头；Provider 未返回 usage 时只记录请求状态和耗时，不在本地估算 Token。
 
 导入前请确认文件来源可信；替换操作不可撤销，建议先另行导出当前库备份。
 

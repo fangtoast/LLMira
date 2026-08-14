@@ -3,14 +3,21 @@
  * @file src/lib/store/settingsStore.test.ts
  * @author fangtoast <fangtoast@foxmail.com>
  * @date 2026-08-14
- * @description v4 迁移与 Provider 级收藏隔离测试。
+ * @description v6 迁移、用量偏好与 Provider 级收藏隔离测试。
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { migrateSettingsState, useSettingsStore } from "./settingsStore";
 
-describe("settings store v5", () => {
+describe("settings store v6", () => {
   beforeEach(() => {
     useSettingsStore.setState({ favoriteModelsByProvider: {}, reasoningModeByProviderModel: {}, translationModelByProviderId: {} });
+  });
+  it("补齐用量与价格设置默认值", () => {
+    const migrated = migrateSettingsState({});
+    expect(migrated.pricingOverrides).toEqual({});
+    expect(migrated.usageRangePreference).toBe("30d");
+    expect(migrated.usageHeatmapView).toBe("daily");
+    expect(migrated.cnyPerUsd).toBeUndefined();
   });
 
   it("将旧 enableThinking 映射为当前 Provider/模型的 high", () => {

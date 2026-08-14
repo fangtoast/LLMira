@@ -9,6 +9,7 @@
  */
 import Dexie, { type Table } from "dexie";
 import type { ChatMessage, Conversation } from "@/types";
+import type { UsageEvent } from "@/lib/usage/types";
 
 export interface ConversationRecord extends Conversation {
   keyword?: string;
@@ -21,12 +22,18 @@ export interface MessageRecord extends ChatMessage {
 class LlmiraDB extends Dexie {
   conversations!: Table<ConversationRecord, string>;
   messages!: Table<MessageRecord, string>;
+  usageEvents!: Table<UsageEvent, string>;
 
   constructor() {
     super("llmira-db");
     this.version(1).stores({
       conversations: "id, title, model, updatedAt, createdAt, keyword",
       messages: "id, conversationId, role, createdAt",
+    });
+    this.version(2).stores({
+      conversations: "id, title, model, updatedAt, createdAt, keyword",
+      messages: "id, conversationId, role, createdAt",
+      usageEvents: "id, occurredAt, operationId, kind, providerId, modelId, status, [providerId+modelId]",
     });
   }
 }

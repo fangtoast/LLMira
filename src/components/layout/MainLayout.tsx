@@ -11,9 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { X } from "lucide-react";
-import { WelcomePanel } from "@/components/chat/WelcomePanel";
 import { InputBar } from "@/components/chat/InputBar";
-import { TokenStats } from "@/components/chat/TokenStats";
 import { Button } from "@/components/ui/button";
 import { useChat } from "@/hooks/useChat";
 import { useConversations } from "@/hooks/useConversations";
@@ -25,6 +23,14 @@ import { PersonalRail } from "./PersonalRail";
 const ChatWindow = dynamic(
   () => import("@/components/chat/ChatWindow").then((module) => module.ChatWindow),
   { ssr: false, loading: () => <div className="min-h-0 flex-1" aria-label="正在载入会话" /> },
+);
+const TokenStats = dynamic(
+  () => import("@/components/chat/TokenStats").then((module) => module.TokenStats),
+  { ssr: false },
+);
+const WelcomePanel = dynamic(
+  () => import("@/components/chat/WelcomePanel").then((module) => module.WelcomePanel),
+  { ssr: false, loading: () => <div className="h-28" aria-label="正在载入欢迎页" /> },
 );
 const OnboardingModal = dynamic(
   () => import("@/components/modals/OnboardingModal").then((module) => module.OnboardingModal),

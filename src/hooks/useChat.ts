@@ -25,6 +25,9 @@ import { searchWeb } from "@/lib/search/webSearch";
 import { useConversations } from "./useConversations";
 import type { ApiRequestSnapshot, ChatAttachment, ChatMessage, ChatMessageVariant, TokenUsage } from "@/types";
 import type { McpToolCall } from "@/lib/mcp/types";
+import { sumTokenUsage } from "@/lib/usage/tokens";
+
+const loadUsageRecorders = () => import("@/lib/usage/recorders");
 
 function uid() {
   return crypto.randomUUID();
@@ -275,7 +278,7 @@ export function useChat() {
       const toolByWireName = new Map(chatTools.map((tool) => [tool.descriptor.wireName, tool]));
       const runtime = await getMcpRuntimeAdapter();
       const protocolMessages = [...apiMessages];
-      let lastUsage: TokenUsage | undefined;
+      let totalUsage: TokenUsage | undefined;
 
       const persistCurrent = () => {
         updateMessage(conversationId, assistantId, {
@@ -297,7 +300,7 @@ export function useChat() {
       };
 
       const persistComplete = async () => {
-        setLastTokenUsage(lastUsage);
+        setLastTokenUsage(totalUsage);
         const list = useChatStore.getState().messagesByConversation[conversationId] ?? [];
         const final = list.map((message) => {
           if (message.id !== assistantId) return message;
@@ -305,7 +308,7 @@ export function useChat() {
             ...message,
             content: acc,
             thinkingContent: thinkingAcc || undefined,
-            tokenUsage: lastUsage,
+            tokenUsage: totalUsage,
             toolCalls: persistedToolCalls.length ? persistedToolCalls : undefined,
             status: "completed" as const,
           };
@@ -314,7 +317,7 @@ export function useChat() {
             content: acc,
             thinkingContent: thinkingAcc || undefined,
             modelName: message.modelName,
-            tokenUsage: lastUsage,
+            tokenUsage: totalUsage,
             createdAt: message.createdAt,
           };
           const variants = [...message.variants, variant];
@@ -326,7 +329,10 @@ export function useChat() {
       for (let round = 0; round < MAX_MCP_TOOL_ROUNDS; round += 1) {
         let roundCalls: import("@/lib/api/types").ChatToolCallWire[] = [];
         let abortReason: StreamAbortReason | undefined;
-        await streamChatCompletion(
+        let roundUsage: TokenUsage | undefined;
+        const requestStartedAt = Date.now();
+        try {
+          await streamChatCompletion(
           apiProfile,
           {
             model: chatModel,
@@ -352,7 +358,8 @@ export function useChat() {
               patchAssistantMessage(conversationId, assistantId, { thinkingContent: thinkingAcc });
             },
             onDone: (usage, toolCalls) => {
-              lastUsage = usage ?? lastUsage;
+              roundUsage = usage;
+              totalUsage = sumTokenUsage(totalUsage, usage);
               roundCalls = toolCalls ?? [];
             },
             onAbort: (reason) => {
@@ -360,7 +367,13 @@ export function useChat() {
             },
           },
           { signal: ac.signal, streamTimeoutMs: DEFAULT_STREAM_TIMEOUT_MS },
-        );
+          );
+        } catch (error) {
+          await (await loadUsageRecorders()).recordModelUsage(assistantId, requestStartedAt, "failed", apiProfile, chatModel, conversationId, assistantId, roundUsage, nativeWebSearch);
+          throw error;
+        }
+        const recordedUsage = await (await loadUsageRecorders()).recordModelUsage(assistantId, requestStartedAt, abortReason === "timeout" ? "timeout" : abortReason ? "cancelled" : "completed", apiProfile, chatModel, conversationId, assistantId, roundUsage, nativeWebSearch);
+        if (recordedUsage.costUsd !== undefined && totalUsage) totalUsage = { ...totalUsage, estimatedCostUSD: (totalUsage.estimatedCostUSD ?? 0) + recordedUsage.costUsd };
 
         if (abortReason) {
           await persistAbort(abortReason);
@@ -442,6 +455,7 @@ export function useChat() {
           persistedToolCalls = persistedToolCalls.map((item) => item.id === call.id ? { ...call } : item);
           persistCurrent();
           const tool = toolByWireName.get(call.wireName)!;
+          const toolStartedAt = Date.now();
           try {
             const result = await runtime.callTool(
               tool.connection,
@@ -457,6 +471,7 @@ export function useChat() {
             call.error = error instanceof Error ? error.message : "工具调用失败。";
           }
           call.completedAt = Date.now();
+          await (await loadUsageRecorders()).recordMcpUsage(assistantId, toolStartedAt, call.status === "completed" ? "completed" : call.status === "cancelled" ? "cancelled" : "failed", conversationId, assistantId, { serverId: call.serverId, serverName: call.serverName, toolName: call.toolName });
           persistedToolCalls = persistedToolCalls.map((item) => item.id === call.id ? { ...call } : item);
           persistCurrent();
         }
@@ -527,6 +542,9 @@ export function useChat() {
         requestSnapshot,
       });
 
+      const requestStartedAt = Date.now();
+      let imageUsage: TokenUsage | undefined;
+      let imageAbortReason: StreamAbortReason | undefined;
       try {
         let text = "";
         let images: string[] = [];
@@ -539,10 +557,12 @@ export function useChat() {
                 text += token;
                 patchAssistantMessage(conversationId, assistantId, { content: text });
               },
-              onDone: async () => {
+              onDone: async (usage) => {
+                imageUsage = usage;
                 images = extractGeneratedImageUrls(text);
               },
               onAbort: async (reason) => {
+                imageAbortReason = reason;
                 const abortedText = formatAbortedStreamAssistantContent(text, reason);
                 patchAssistantMessage(conversationId, assistantId, { content: abortedText });
                 text = abortedText;
@@ -560,6 +580,7 @@ export function useChat() {
           text = images.length ? images.map((url) => `![generated](${url})`).join("\n\n") : "";
         }
         const finalText = text || "未生成图片，请检查模型或配额。";
+        await (await loadUsageRecorders()).recordImageUsage(assistantId, requestStartedAt, imageAbortReason === "timeout" ? "timeout" : imageAbortReason ? "cancelled" : "completed", apiProfile, imageModel, conversationId, assistantId, { count: images.length || 1, size: "size" in requestBody ? String(requestBody.size ?? "auto") : "auto", quality: "quality" in requestBody ? String(requestBody.quality ?? "auto") : "auto" }, imageUsage);
         const list = useChatStore.getState().messagesByConversation[conversationId] ?? [];
         const final = list.map((m) => {
           if (m.id !== assistantId) return m;
@@ -568,7 +589,7 @@ export function useChat() {
             content: finalText,
             modelName: imageModel,
             providerId: apiProfile.id,
-            status: "completed",
+            status: imageAbortReason ? (text ? "partial" : "cancelled") : "completed",
             generatedImageUrls: images,
             requestSnapshot,
           };
@@ -588,6 +609,7 @@ export function useChat() {
         replaceMessages(conversationId, final);
         await saveFinalMessages(conversationId, final);
       } catch (error) {
+        await (await loadUsageRecorders()).recordImageUsage(assistantId, requestStartedAt, isAbortError(error) ? "cancelled" : "failed", apiProfile, imageModel, conversationId, assistantId, { count: 1 }, imageUsage);
         if (isAbortError(error)) {
           const kind = streamUserAbortKindRef.current;
           streamUserAbortKindRef.current = null;
@@ -690,11 +712,14 @@ export function useChat() {
           let evidence: string | undefined;
           let citations: ChatMessage["citations"];
           if (wantsSearch && !nativeWebSearch) {
+            const searchStartedAt = Date.now();
             try {
               const searched = await searchWeb(trimmed, { provider: settingsSnapshot.searchProvider, baseUrl: settingsSnapshot.searchBaseUrl || undefined, apiKey: settingsSnapshot.searchApiKey || undefined });
               evidence = searched.evidence;
               citations = searched.citations;
+              await (await loadUsageRecorders()).recordSearchUsage(assistantId, searchStartedAt, "completed", conversationId, assistantId, settingsSnapshot.searchProvider);
             } catch (searchError) {
+              await (await loadUsageRecorders()).recordSearchUsage(assistantId, searchStartedAt, "failed", conversationId, assistantId, settingsSnapshot.searchProvider);
               setClientNotice(`联网搜索失败，已继续普通对话：${searchError instanceof Error ? searchError.message : "未知错误"}`);
             }
           }

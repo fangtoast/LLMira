@@ -27,6 +27,7 @@ const fallbackBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.hui
 
 export type ApiRequestProfile = {
   id?: string;
+  name?: string;
   apiKey: string;
   baseUrl: string;
   executionMode?: "device" | "server";
@@ -123,6 +124,34 @@ function isAbortError(e: unknown): boolean {
 export const DEFAULT_STREAM_TIMEOUT_MS = 30 * 60 * 1000;
 
 const DEFAULT_SHORT_REQUEST_TIMEOUT_MS = 30_000;
+
+type ProviderUsagePayload = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  prompt_tokens_details?: { cached_tokens?: number };
+  completion_tokens_details?: { reasoning_tokens?: number };
+  input_tokens_details?: { cached_tokens?: number };
+  output_tokens_details?: { reasoning_tokens?: number };
+};
+
+/** Normalize OpenAI-compatible token payload variants without estimating missing values. */
+export function normalizeTokenUsage(usage?: ProviderUsagePayload): TokenUsage | undefined {
+  if (!usage) return undefined;
+  const promptTokens = usage.prompt_tokens ?? usage.input_tokens;
+  const completionTokens = usage.completion_tokens ?? usage.output_tokens;
+  if (promptTokens === undefined || completionTokens === undefined) return undefined;
+  return {
+    promptTokens,
+    cachedPromptTokens: usage.prompt_tokens_details?.cached_tokens ?? usage.input_tokens_details?.cached_tokens ?? 0,
+    completionTokens,
+    reasoningTokens: usage.completion_tokens_details?.reasoning_tokens ?? usage.output_tokens_details?.reasoning_tokens ?? 0,
+    totalTokens: usage.total_tokens ?? promptTokens + completionTokens,
+    requestCount: 1,
+  };
+}
 
 type TimeoutSignalBundle = {
   requestSignal: AbortSignal;
@@ -251,7 +280,7 @@ export async function streamChatCompletion(
         try {
           const json = JSON.parse(data) as {
             choices?: Array<{ delta?: { content?: string; reasoning_content?: unknown; reasoning?: unknown; thinking?: unknown; tool_calls?: import("./types").ChatToolCallDelta[] } }>;
-            usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+            usage?: ProviderUsagePayload;
           };
           const delta = json.choices?.[0]?.delta;
           const token = delta?.content;
@@ -263,12 +292,7 @@ export async function streamChatCompletion(
             callbacks.onToolCallDelta?.(toolDelta);
           }
           if (json.usage) {
-            usage = {
-              promptTokens: json.usage.prompt_tokens,
-              completionTokens: json.usage.completion_tokens,
-              totalTokens: json.usage.total_tokens,
-              estimatedCostUSD: Number((json.usage.total_tokens * 0.000002).toFixed(6)),
-            };
+            usage = normalizeTokenUsage(json.usage) ?? usage;
           }
         } catch (error) {
           logger.exception(error, "stream parse line failed");

@@ -52,7 +52,7 @@
 - 文件上限 250 MB，允许 PDF、DOCX、TXT、Markdown、HTML、CSV。
 - 网页抓取只允许 HTTP(S)，拒绝凭据 URL、本机、内网、链路本地、云元数据与危险重定向。
 - MCP 工具必须声明风险、超时、输出上限和允许域名；服务器 stdio 仅接受固定 digest 镜像，并通过只读、无网络、CPU/内存/PID 限额的容器执行。
-- Windows 本机 stdio MCP 桥接留待后续适配；首发 Windows 与 Android 均使用服务器 MCP。
+- Windows 个人端的 stdio MCP 由 Tauri/Rust 运行时隔离执行，命令与参数分开传递；Android/Web 仅允许远程 Streamable HTTP MCP。
 
 ## 审计
 

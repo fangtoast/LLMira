@@ -74,9 +74,10 @@ export function DataSettings() {
   async function deleteAllData() {
     await clearKnownSecrets();
     const { db } = await import("@/lib/db/dexie");
-    await db.transaction("rw", db.conversations, db.messages, async () => {
+    await db.transaction("rw", db.conversations, db.messages, db.usageEvents, async () => {
       await db.messages.clear();
       await db.conversations.clear();
+      await db.usageEvents.clear();
     });
     clearSavedConversationId();
     await useSettingsStore.persist.clearStorage();
@@ -88,14 +89,14 @@ export function DataSettings() {
       <SettingsPageHeader title="数据" description="备份文件包含聊天、工具调用记录与非敏感设置，不包含 API Key、环境变量或敏感请求头。" />
       <input ref={inputRef} type="file" accept="application/json,.json" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importBackup(file); event.currentTarget.value = ""; }} />
       <SettingsCard title="数据备份与恢复">
-        <SettingsRow title="全量备份" description="导出 version 3 JSON，可在其他 LLMira 设备恢复。" control={<Button variant="outline" onClick={() => void exportFullBackupDownload()}><Download className="mr-2 size-4" />备份</Button>} />
+        <SettingsRow title="全量备份" description="导出 version 4 JSON，包含用量记录与非敏感价格设置。" control={<Button variant="outline" onClick={() => void exportFullBackupDownload()}><Download className="mr-2 size-4" />备份</Button>} />
         <SettingsRow title="合并恢复" description="保留当前聊天和设置，追加备份内容。" control={<Button variant="outline" onClick={() => chooseFile("merge")}><FilePlus2 className="mr-2 size-4" />选择备份</Button>} />
         <SettingsRow title="覆盖恢复" description="用备份内容替换当前聊天与非敏感设置。" control={<Button variant="outline" onClick={() => chooseFile("replace")}><RefreshCcw className="mr-2 size-4" />覆盖恢复</Button>} />
         {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
       </SettingsCard>
       <SettingsCard title="危险操作" description="这些操作无法通过应用内撤销。">
         <SettingsRow title="重置设置" description="清除 Provider、模型、搜索、外观和 MCP 设置，保留聊天记录。" control={<AlertDialog><AlertDialogTrigger asChild><Button variant="outline"><RotateCcw className="mr-2 size-4" />重置设置</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>确认重置全部设置？</AlertDialogTitle><AlertDialogDescription>聊天记录会保留，但设备密钥与 MCP 秘密值会被删除。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel><AlertDialogAction onClick={() => void resetSettings()}>确认重置</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>} />
-        <SettingsRow title="删除全部个人数据" description="删除聊天记录、设置及已知设备秘密值。" control={<AlertDialog><AlertDialogTrigger asChild><Button variant="destructive"><Trash2 className="mr-2 size-4" />删除数据</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>永久删除全部个人数据？</AlertDialogTitle><AlertDialogDescription>此操作会删除当前设备上的聊天、设置和秘密值，且无法恢复。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => void deleteAllData()}>永久删除</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>} />
+        <SettingsRow title="删除全部个人数据" description="删除聊天、用量记录、设置及已知设备秘密值。" control={<AlertDialog><AlertDialogTrigger asChild><Button variant="destructive"><Trash2 className="mr-2 size-4" />删除数据</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>永久删除全部个人数据？</AlertDialogTitle><AlertDialogDescription>此操作会删除当前设备上的聊天、用量记录、设置和秘密值，且无法恢复。</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>取消</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => void deleteAllData()}>永久删除</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>} />
       </SettingsCard>
     </div>
   );

@@ -84,13 +84,15 @@ LLMira 先解决一个人的日常 AI 使用：把自己的 API Host 和 API Key
 | 跨模型上下文 | 第一轮使用 GPT、下一轮切换 Claude 时，Claude 会收到同一会话的有效历史；旧回答保留实际 Provider/模型标签 |
 | 图像生成 | 独立“图像”入口，支持兼容的尺寸/质量参数、重新生成、预览与下载 |
 | 联网查询 | 原生搜索优先；SearXNG/Tavily/Brave 回退；最多 5 条结果、抓取前 3 条并持久化引用 |
+| 个人 MCP | Windows 支持 Streamable HTTP 与 STDIO，Android/Web 支持远程 HTTP；工具逐次审批、超时与取消均进入聊天工具循环 |
+| 用量与计费 | 从启用后的新调用开始，在本机记录聊天、翻译、生图、搜索与 MCP；提供年度热力图、筛选明细、价格覆盖和 CSV/JSON 导出 |
 | 设备安全 | Tauri HTTP 直连；Key 进入 Stronghold，不写 localStorage；Provider 元数据、会话和草稿使用设备数据库 |
 | Web 网关 | Fastify 提供 Provider 临时检查、目录刷新、聚合模型和 OpenAI-compatible 网关；服务端密钥加密保存 |
 
 ### 正在继续完成
 
 - 个人知识库已拥有独立入口，文档摄取、混合检索与定位引用仍在后续阶段；
-- Agent、MCP、模型对比和团队用量保留为扩展/实验能力，不作为本版个人聊天的完成声明；
+- Agent、模型对比和团队用量保留为扩展/实验能力；个人 MCP 与本地用量账本已进入设置中心；
 - iOS、完整离线知识库、正式商店签名和 Windows Authenticode 不包含在本预览版内。
 
 ## 参考项目与 LLMira 的取舍
@@ -99,7 +101,7 @@ LLMira 不复制参考项目的代码、素材或界面，只学习其公开产�
 
 | 参考方向 | LLMira 对应能力 | 本版取舍 |
 | --- | --- | --- |
-| [Cherry Studio](https://github.com/CherryHQ/cherry-studio) 的多供应商、模型能力与 MCP | 多 Provider、能力标记、模型/Provider 联合选择 | 首先把扫描和普通聊天做稳，MCP 留在扩展区 |
+| [Cherry Studio](https://github.com/CherryHQ/cherry-studio) 的多供应商、模型能力与 MCP | 多 Provider、能力标记、模型/Provider 联合选择与个人 MCP | 只借鉴公开架构和行为，不复制 AGPL 实现；不包含市场、自动安装和 OAuth |
 | [Chatbox](https://github.com/chatboxai/chatbox) 的轻量对话与跨端体验 | 新对话首屏、会话历史、流式输出、附件与独立设置 | 默认界面不展示团队卡片、知识树或 Agent 授权 |
 | [AnythingLLM](https://github.com/Mintplex-Labs/anything-llm) 的知识与多用户工作区 | 独立知识库入口、可选团队服务器和工作区隔离 | 普通上下文不滥用 RAG；邀请只属于团队功能 |
 

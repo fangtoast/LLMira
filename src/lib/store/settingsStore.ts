@@ -15,6 +15,8 @@ import type { ExecutionMode, ProviderModel, ProviderProtocol } from "@llmira/con
 import { deleteProviderSecret, readProviderSecret, saveProviderSecret } from "@/lib/providers/runtime";
 import type { ReasoningMode } from "@/lib/models/catalog";
 import type { McpServerConfig } from "@/lib/mcp/types";
+import { pricingOverrideKey } from "@/lib/usage/keys";
+import type { PricingOverride } from "@/lib/usage/types";
 
 const DEFAULT_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
 const DEFAULT_API_PROFILE_ID = "default";
@@ -76,6 +78,8 @@ export type ApiProfile = {
 };
 
 export type AccentTheme = "blue" | "cyan" | "violet";
+export type UsageRangePreference = "7d" | "30d" | "90d" | "1y" | "all";
+export type UsageHeatmapView = "daily" | "weekly" | "cumulative";
 
 const DEFAULT_MODEL_GENERATION_SETTINGS: ModelGenerationSettings = {
   temperature: 0.7,
@@ -205,6 +209,10 @@ export interface SettingsState {
   searchBaseUrl: string;
   searchApiKey: string;
   accentTheme: AccentTheme;
+  cnyPerUsd?: number;
+  pricingOverrides: Record<string, PricingOverride>;
+  usageRangePreference: UsageRangePreference;
+  usageHeatmapView: UsageHeatmapView;
   mcpServers: McpServerConfig[];
   activeMcpServerId: string;
   favoriteModelsByProvider: Record<string, string[]>;
@@ -238,6 +246,11 @@ export interface SettingsState {
   setSearchProfile: (patch: Partial<Pick<SettingsState, "searchProvider" | "searchBaseUrl" | "searchApiKey">>) => void;
   saveSearchApiKey: (key: string) => Promise<void>;
   setAccentTheme: (theme: AccentTheme) => void;
+  setCnyPerUsd: (rate?: number) => void;
+  setPricingOverride: (override: PricingOverride) => void;
+  deletePricingOverride: (providerId: string, modelId: string) => void;
+  setUsageRangePreference: (range: UsageRangePreference) => void;
+  setUsageHeatmapView: (view: UsageHeatmapView) => void;
   addMcpServer: () => string;
   updateMcpServer: (serverId: string, patch: Partial<Omit<McpServerConfig, "id">>) => void;
   deleteMcpServer: (serverId: string) => void;
@@ -258,7 +271,7 @@ export interface SettingsState {
   setHasCompletedOnboarding: (completed: boolean) => void;
 }
 
-/** 将旧版持久化设置升级为 v5，并清除历史明文密钥与 MCP 秘密字段。 */
+/** 将旧版持久化设置升级为 v6，并清除历史明文密钥与 MCP 秘密字段。 */
 export function migrateSettingsState(persisted: unknown) {
   const data = (persisted ?? {}) as Partial<SettingsState> & { apiKey?: string; enableThinking?: boolean };
   const hadLegacyPlaintextSecret = Boolean(data.apiKey) || (Array.isArray(data.apiProfiles) && data.apiProfiles.some((profile) => Boolean(profile?.apiKey)));
@@ -284,6 +297,10 @@ export function migrateSettingsState(persisted: unknown) {
     reasoningModeByProviderModel,
     translationModelByProviderId: data.translationModelByProviderId ?? {},
     accentTheme: data.accentTheme === "cyan" || data.accentTheme === "violet" ? data.accentTheme : "blue",
+    cnyPerUsd: typeof data.cnyPerUsd === "number" && data.cnyPerUsd > 0 ? data.cnyPerUsd : undefined,
+    pricingOverrides: data.pricingOverrides ?? {},
+    usageRangePreference: ["7d", "30d", "90d", "1y", "all"].includes(data.usageRangePreference ?? "") ? data.usageRangePreference : "30d",
+    usageHeatmapView: ["daily", "weekly", "cumulative"].includes(data.usageHeatmapView ?? "") ? data.usageHeatmapView : "daily",
     mcpServers: Array.isArray(data.mcpServers) ? data.mcpServers.map((server) => sanitizeMcpServerConfig(server)) : [],
     activeMcpServerId: typeof data.activeMcpServerId === "string" ? data.activeMcpServerId : "",
     hasCompletedOnboarding: hadLegacyPlaintextSecret ? false : data.hasCompletedOnboarding,
@@ -307,6 +324,10 @@ export const useSettingsStore = create<SettingsState>()(
       searchBaseUrl: "",
       searchApiKey: "",
       accentTheme: "blue",
+      cnyPerUsd: undefined,
+      pricingOverrides: {},
+      usageRangePreference: "30d",
+      usageHeatmapView: "daily",
       mcpServers: [],
       activeMcpServerId: "",
       favoriteModelsByProvider: {},
@@ -457,6 +478,17 @@ export const useSettingsStore = create<SettingsState>()(
         set({ searchApiKey });
       },
       setAccentTheme: (accentTheme) => set({ accentTheme }),
+      setCnyPerUsd: (cnyPerUsd) => set({ cnyPerUsd: cnyPerUsd && cnyPerUsd > 0 ? cnyPerUsd : undefined }),
+      setPricingOverride: (override) => set((state) => ({
+        pricingOverrides: { ...state.pricingOverrides, [pricingOverrideKey(override.providerId, override.modelId)]: override },
+      })),
+      deletePricingOverride: (providerId, modelId) => set((state) => {
+        const pricingOverrides = { ...state.pricingOverrides };
+        delete pricingOverrides[pricingOverrideKey(providerId, modelId)];
+        return { pricingOverrides };
+      }),
+      setUsageRangePreference: (usageRangePreference) => set({ usageRangePreference }),
+      setUsageHeatmapView: (usageHeatmapView) => set({ usageHeatmapView }),
       addMcpServer: () => {
         const id = createEntityId("mcp");
         const now = Date.now();
@@ -616,7 +648,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "huiyan-settings",
-      version: 5,
+      version: 6,
       storage,
       migrate: (persisted) => migrateSettingsState(persisted),
       partialize: (state) => ({
@@ -633,6 +665,10 @@ export const useSettingsStore = create<SettingsState>()(
         searchBaseUrl: state.searchBaseUrl,
         searchApiKey: "",
         accentTheme: state.accentTheme,
+        cnyPerUsd: state.cnyPerUsd,
+        pricingOverrides: state.pricingOverrides,
+        usageRangePreference: state.usageRangePreference,
+        usageHeatmapView: state.usageHeatmapView,
         mcpServers: state.mcpServers.map((server) => sanitizeMcpServerConfig(server)),
         activeMcpServerId: state.activeMcpServerId,
         favoriteModelsByProvider: state.favoriteModelsByProvider,

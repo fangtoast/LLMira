@@ -26,6 +26,9 @@ import { useSettingsStore } from "@/lib/store/settingsStore";
 import { getTranslationExportFilename, runTranslationChunks, splitTranslationText, TRANSLATION_MAX_CHARS, type TranslationJob } from "@/lib/translation/core";
 import { readTranslationFile, TRANSLATION_FILE_ACCEPT } from "@/lib/translation/file";
 import { cn } from "@/lib/utils";
+import type { TokenUsage } from "@/types";
+
+const loadUsageRecorders = () => import("@/lib/usage/recorders");
 
 const LANGUAGES = [
   ["auto", "自动检测"], ["zh-CN", "简体中文"], ["zh-TW", "繁体中文"], ["en", "英语"],
@@ -106,6 +109,7 @@ export function TranslationWorkbench() {
     }
     setError(undefined);
     const controller = new AbortController();
+    const operationId = crypto.randomUUID();
     abortRef.current = controller;
     setStreamingText("");
     const result = await runTranslationChunks({
@@ -116,7 +120,10 @@ export function TranslationWorkbench() {
       onProgress: setJob,
       translateChunk: async (chunk, index, signal) => {
         let output = "";
-        await streamChatCompletion(profile, {
+        let usage: TokenUsage | undefined;
+        const startedAt = Date.now();
+        try {
+          await streamChatCompletion(profile, {
           model: translationModel,
           temperature: 0.2,
           top_p: 1,
@@ -130,11 +137,16 @@ export function TranslationWorkbench() {
             output += token;
             setStreamingText(output);
           },
-          onDone: () => setStreamingText(""),
+          onDone: (nextUsage) => { usage = nextUsage; setStreamingText(""); },
           onAbort: () => setStreamingText(""),
-        }, { signal });
+          }, { signal });
+          if (!signal.aborted && !output) throw new Error(`第 ${index + 1} 段未返回译文`);
+          await (await loadUsageRecorders()).recordTranslationUsage(operationId, startedAt, signal.aborted ? "cancelled" : "completed", profile, translationModel, usage);
+        } catch (translationError) {
+          await (await loadUsageRecorders()).recordTranslationUsage(operationId, startedAt, signal.aborted ? "cancelled" : "failed", profile, translationModel, usage);
+          throw translationError;
+        }
         setStreamingText("");
-        if (!signal.aborted && !output) throw new Error(`第 ${index + 1} 段未返回译文`);
         return output;
       },
     });

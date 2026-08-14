@@ -1,92 +1,76 @@
-<!--
-  LLMira 设计验收记录
-  Author: fangtoast <fangtoast@foxmail.com>
--->
+# Design QA Report
 
-# LLMira 设计验收
+## Scope
 
-## 2026-08-14 网页版模型、输入区与翻译工作台
+- Target: `C:\Users\fangxiao\AppData\Local\Temp\codex-clipboard-7293e481-7a0d-4724-b977-2a1c9a5ec475.png`
+- Implementation: `http://localhost:3000/settings#usage`
+- Target image: 2048 × 1216 px.
+- Browser captures: 1920 × 1080, 1440 × 1000, 430 × 932, and 390 × 844 at DPR 1.
+- Compared state: the reference contains populated sample activity; LLMira intentionally shows the real empty local ledger because old conversations are not backfilled and preview data is prohibited.
+- Full-view evidence: `C:\Users\fangxiao\AppData\Local\Temp\llmira-usage-1920.png`, `C:\Users\fangxiao\AppData\Local\Temp\llmira-usage-1440-dense.png`, `C:\Users\fangxiao\AppData\Local\Temp\llmira-usage-430.png`, and `C:\Users\fangxiao\AppData\Local\Temp\llmira-usage-390.png`.
+- Focused interaction evidence: `C:\Users\fangxiao\AppData\Local\Temp\llmira-usage-pricing.png`.
+- Same-input comparison: `C:\Users\fangxiao\AppData\Local\Temp\llmira-usage-comparison.png`.
 
-## 验收基准
+## Iteration history
 
-- 聊天基准：`C:/Users/fangxiao/.codex/generated_images/019ffe64-b888-7e61-83a9-3ad4c2960d1b/exec-fa173eea-4942-4e63-972a-45d173f2e682.png`
-- 翻译基准：`C:/Users/fangxiao/.codex/generated_images/019ffe64-b888-7e61-83a9-3ad4c2960d1b/exec-f3b3e76a-079d-4672-bca5-b2eefbdb3d83.png`
-- 桌面验收尺寸：1440 × 1024
-- 移动验收尺寸：390 × 844
-- 浏览器验收地址：`http://localhost:3001/`
+1. Initial 1440 px capture exposed a P2 horizontal-overflow regression: the heatmap min-content width widened the entire detail column and clipped the fifth metric and ranking card.
+2. The detail grid tracks were constrained with `minmax(0, 1fr)`, page overflow was isolated, and heat cells received fixed compact dimensions. A repeated 1440 px measurement confirmed `main.clientWidth === main.scrollWidth`; the full 365-day heatmap now fits on desktop.
+3. Initial mobile capture made the five metrics too tall. They were changed to a compact two-column segmented layout with the final streak metric spanning the row. Repeated 430/390 px captures confirmed no document-level horizontal overflow; only the specified 26-week heatmap scrolls within its own card.
 
-## 最终截图
+## Final comparison findings
 
-- `llmira-chat-model-library-1440x1024.png`：桌面聊天空白态，模型资料库打开，收藏模型置顶。
-- `llmira-translate-desktop-1440x1024.png`：桌面翻译双栏空白态。
-- `llmira-chat-mobile-390x844.png`：移动聊天空白态，输入区全部控件可见且无横向溢出。
-- `llmira-model-sheet-mobile-390x844.png`：移动全宽模型 Sheet。
-- `llmira-translate-mobile-390x844.png`：移动翻译上下堆叠布局。
+### Layout and hierarchy
 
-截图目录：`C:/Users/fangxiao/.codex/visualizations/2026/08/14/019ffe64-b888-7e61-83a9-3ad4c2960d1b/`
+- The identity hero, five-part metric strip, Token activity area, paired insight/ranking cards, and deeper analysis order match the approved direction.
+- LLMira keeps its existing product rail and settings taxonomy instead of copying unrelated reference navigation.
+- Desktop whitespace and content width are consistent with the reference hierarchy; mobile reduces density without hiding core actions.
 
-## 对照结论
+### Typography, color, and components
 
-| 检查面 | 结果 |
-| --- | --- |
-| 布局与信息层级 | 通过。聊天保持左侧导航、会话栏和底部输入区；模型资料库为桌面双栏覆盖层，翻译为桌面双栏、移动上下堆叠。 |
-| 字体与密度 | 通过。沿用项目现有中文字体与紧凑工具栏密度，标题、辅助文本和状态层级清晰。 |
-| 色彩与表面 | 通过。深色背景、蓝色主操作、细边框和轻量高亮与概念图一致。 |
-| 图标与品牌 | 通过。模型品牌使用本地按需加载的 Lobe Icons SVG；通用操作使用现有 Lucide 图标。 |
-| 响应式与文案 | 通过。390 × 844 无横向溢出；移动输入区缩短标签，模型 Sheet 关闭按钮和收藏按钮均不重叠。 |
+- Uses the existing LLMira theme tokens, muted borders, low-contrast surfaces, tabular numbers, shadcn dialogs/selects/buttons, and semantic HTML/SVG.
+- No reference branding, pets, invitation, sharing, or marketplace assets were copied.
 
-概念图中的模型和聊天内容为设计示例；验收图使用本地模拟 Provider 的真实扫描结果，没有伪造不可用模型。空白聊天态的模型覆盖层会随居中的输入区定位，进入正常对话后输入区下沉至底部。
+### State and interaction checks
 
-## 修正历史
+- Hash deep-link opens the Usage section.
+- Daily/weekly/cumulative controls, filters, range controls, CSV/JSON export, pricing dialog, pagination, and destructive clear confirmation are present and keyboard-addressable.
+- Price dialog remains within the viewport and independently scrolls its catalog.
+- Browser console contains no errors in the tested states.
 
-1. 第一轮发现桌面模型层覆盖会话栏、单色品牌图标在深色主题不可见、移动输入工具栏末端拥挤、Sheet 关闭按钮与筛选控件相邻过紧。
-2. 已调整模型层对齐、深色图标反转、移动按钮宽度和下拉箭头显示，并增加 Sheet 顶部安全间距。
-3. 第二轮将源图和最终截图成对复核，未发现仍需修正的 P0、P1 或 P2 视觉问题。
+### Remaining differences
 
-## 交互验收
+- P3: the reference heatmap is populated while the implementation evidence is an honest empty ledger. Density, labels, legend, and responsive behavior were compared; data color distribution will emerge only from real new usage.
+- P3: LLMira's persistent product rail consumes more horizontal space than the reference application. This is intentional product architecture and does not affect the profile-to-insight hierarchy.
 
-- 收藏模型后模型不切换；刷新页面后收藏仍恢复。
-- 上游 `supports_reasoning` 元数据在真实扫描后保留；推理模型可选择四档，真实请求已验证 `reasoning_effort: "high"`。
-- README Markdown 文件上传后完整读取 6,380 字符，翻译成功并可导出 TXT/Markdown。
-- 移动和桌面页面均无横向溢出；生产页面控制台未发现应用自身的新错误。
+## Final Result: PASSED
 
-最终结果：passed
+No open P1 or P2 visual issues remain for the approved target and required responsive widths.
 
-## 历史记录：知识工作台与 Android 方案
+## Historical record: 2026-08-14 model library, input and translation workbench
 
-### 验收基准
+### Acceptance baseline
 
-- 桌面参考稿：`exec-23e19815-8abb-4da8-8469-b8e63b164530.png`
-- Android 参考稿：`exec-07373f0e-f467-42ec-95d1-eb0665ea40eb.png`
-- 桌面视口：1440 × 1024
-- 手机视口：390 × 844
-- 本地预览：`http://127.0.0.1:3000/?preview=1`
+- Chat reference: `C:/Users/fangxiao/.codex/generated_images/019ffe64-b888-7e61-83a9-3ad4c2960d1b/exec-fa173eea-4942-4e63-972a-45d173f2e682.png`
+- Translation reference: `C:/Users/fangxiao/.codex/generated_images/019ffe64-b888-7e61-83a9-3ad4c2960d1b/exec-f3b3e76a-079d-4672-bca5-b2eefbdb3d83.png`
+- Desktop: 1440 × 1024; mobile: 390 × 844.
+- Browser URL at acceptance: `http://localhost:3001/`.
+- Screenshot directory: `C:/Users/fangxiao/.codex/visualizations/2026/08/14/019ffe64-b888-7e61-83a9-3ad4c2960d1b/`.
 
-### 逐项结果
+### Result
 
-| 项目 | 桌面端 | 手机端 | 结果 |
-| --- | --- | --- | --- |
-| 信息架构 | 全局功能栏、知识树、内容区、授权栏完整 | 四项底部导航，次级内容进入面板 | 通过 |
-| 视觉语言 | 石墨黑、蓝色主操作、琥珀授权状态与参考稿一致 | 色彩、圆角、层级与桌面同构 | 通过 |
-| 内容布局 | 四栏无截断，右栏状态与操作完整 | 回答、授权卡和输入区均在主视图可达 | 通过 |
-| 响应式 | 1440 px 下无横向溢出 | 390 px 下页面宽度等于视口宽度 | 通过 |
-| 无障碍名称 | 图标按钮均具有可访问名称 | 图标按钮均具有可访问名称 | 通过 |
-| 弹窗语义 | 来源弹窗有标题与说明 | 知识树面板有标题与说明 | 通过 |
-| 核心交互 | 导航、引用、模型选择、允许/拒绝可操作 | 底部导航、抽屉、允许/拒绝可操作 | 通过 |
+The chat shell, model library and translation workspace passed layout, typography, theme, icon, responsive and copy checks. Real mock-provider scan results were used instead of unavailable model previews. Favorites persisted, reasoning metadata reached real requests, Markdown translation read all 6,380 characters, and desktop/mobile pages had no horizontal overflow or new console errors.
 
-### 交互抽检
+First-round P2 findings covered model-overlay alignment, dark-theme monochrome icons, mobile toolbar crowding and Sheet control spacing. All were corrected; the paired second comparison found no remaining P0, P1 or P2 issue. Final result: passed.
 
-- 打开引用来源并核对标题、文件信息与定位信息。
-- 切换设置页面并返回知识工作台。
-- 执行一次“仅本次允许”，状态更新为已授权。
-- 提交对话并核对运行状态、模型切换、工具模式与实时回答区域。
-- 手机端打开知识树抽屉、切换 Agent 页签并返回对话。
-- 手机端授权按钮完整露出，不被输入框或底部导航遮挡。
+## Historical record: knowledge workbench and Android direction
 
-### 问题清单
+### Acceptance baseline
 
-- P0：0
-- P1：0
-- P2：0
+- Desktop reference: `exec-23e19815-8abb-4da8-8469-b8e63b164530.png`.
+- Android reference: `exec-07373f0e-f467-42ec-95d1-eb0665ea40eb.png`.
+- Desktop: 1440 × 1024; mobile: 390 × 844.
+- Local preview at acceptance: `http://127.0.0.1:3000/?preview=1`.
 
-当时确认稿范围内未发现移动端溢出、无名称按钮或无标题弹窗。
+### Result
+
+Global navigation, knowledge tree, content, authorization, citations, model selection and allow/reject interactions passed on desktop and mobile. The mobile document width matched the viewport, accessible names and dialog titles were present, and no P0, P1 or P2 issue remained in the approved scope. Final result: passed.

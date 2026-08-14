@@ -11,11 +11,6 @@
  */
 import { useCallback, useMemo } from "react";
 import type { ExportedChat, ExportedFullBackup } from "@/lib/chat/exportImport";
-import {
-  buildFullBackupPayload,
-  downloadJsonFile,
-  stringifyFullBackup,
-} from "@/lib/chat/exportImport";
 import type { ConversationRecord } from "@/lib/db/dexie";
 import { useChatStore } from "@/lib/store/chatStore";
 import { useSettingsStore } from "@/lib/store/settingsStore";
@@ -107,6 +102,7 @@ export function useConversations() {
   );
 
   const exportFullBackupDownload = useCallback(async () => {
+    const { buildFullBackupPayload, downloadJsonFile, stringifyFullBackup } = await import("@/lib/chat/exportImport");
     const { db } = await import("@/lib/db/dexie");
     const convs = await db.conversations.orderBy("updatedAt").reverse().toArray();
     const allMsgs = await db.messages.toArray();
@@ -119,7 +115,8 @@ export function useConversations() {
     for (const id of Object.keys(byConv)) {
       byConv[id].sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
     }
-    const payload = buildFullBackupPayload(convs, byConv, useSettingsStore.getState());
+    const usageEvents = await db.usageEvents.toArray();
+    const payload = buildFullBackupPayload(convs, byConv, useSettingsStore.getState(), usageEvents);
     downloadJsonFile(`llmira-full-backup-${Date.now()}.json`, stringifyFullBackup(payload));
   }, []);
 
@@ -148,7 +145,7 @@ export function useConversations() {
           await db.messages.bulkPut(payload);
         }
       });
-      if (data.version === 3) {
+      if (data.version === 3 || data.version === 4) {
         const current = useSettingsStore.getState();
         const importedServers = data.settings.mcpServers.map((server) => ({ ...server, enabled: false, secretsRequired: true }));
         const importedProfiles = data.settings.apiProfiles
@@ -161,8 +158,10 @@ export function useConversations() {
           reasoningModeByProviderModel: { ...data.settings.reasoningModeByProviderModel, ...current.reasoningModeByProviderModel },
           translationModelByProviderId: { ...data.settings.translationModelByProviderId, ...current.translationModelByProviderId },
           modelSettingsById: { ...data.settings.modelSettingsById, ...current.modelSettingsById },
+          pricingOverrides: { ...(data.settings.pricingOverrides ?? {}), ...current.pricingOverrides },
         });
       }
+      if (data.version === 4 && data.usageEvents.length) await db.usageEvents.bulkPut(data.usageEvents);
       await loadAll();
       const list = useChatStore.getState().conversations;
       if (prevActive && list.some((c) => c.id === prevActive)) {
@@ -180,17 +179,19 @@ export function useConversations() {
 
   const importFullBackupReplace = useCallback(async (data: ExportedFullBackup) => {
     const { db } = await import("@/lib/db/dexie");
-    await db.transaction("rw", db.conversations, db.messages, async () => {
+    await db.transaction("rw", db.conversations, db.messages, db.usageEvents, async () => {
       await db.conversations.clear();
       await db.messages.clear();
+      await db.usageEvents.clear();
       for (const { conversation, messages } of data.chats) {
         const keyword = (conversation as ConversationRecord).keyword ?? conversation.title;
         await db.conversations.put({ ...conversation, keyword } as ConversationRecord);
         const payload = messages.map((m) => ({ ...m, conversationId: conversation.id }));
         await db.messages.bulkPut(payload);
       }
+      if (data.version === 4 && data.usageEvents.length) await db.usageEvents.bulkPut(data.usageEvents);
     });
-    if (data.version === 3) {
+    if (data.version === 3 || data.version === 4) {
       useSettingsStore.setState({
         ...data.settings,
         apiProfiles: data.settings.apiProfiles.map((profile) => ({ ...profile, apiKey: "" })),

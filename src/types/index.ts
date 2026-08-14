@@ -101,7 +101,11 @@ export interface Conversation {
 /** 单次补全用量统计（来自流结束时 usage 字段）。 */
 export interface TokenUsage {
   promptTokens: number;
+  cachedPromptTokens?: number;
   completionTokens: number;
+  reasoningTokens?: number;
   totalTokens: number;
+  requestCount?: number;
+  /** Historical snapshot only. New values are calculated from the versioned pricing catalog. */
   estimatedCostUSD?: number;
 }

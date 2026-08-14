@@ -10,11 +10,13 @@
 import type { ChatMessage, Conversation } from "@/types";
 import { sanitizeMcpServerConfig, type AccentTheme, type ApiProfile, type ModelGenerationSettings, type SettingsState } from "@/lib/store/settingsStore";
 import type { McpServerConfig } from "@/lib/mcp/types";
+import type { UsageEvent } from "@/lib/usage/types";
+import { sanitizeUsageEvent } from "@/lib/usage/sanitize";
 
 const EXPORT_VERSION = 1 as const;
 
 /** 全量多会话备份版本（与单会话 `ExportedChat` 的 version=1 区分）。 */
-export const FULL_BACKUP_VERSION = 3 as const;
+export const FULL_BACKUP_VERSION = 4 as const;
 
 type BackupChats = Array<{
   conversation: Conversation & { keyword?: string };
@@ -34,6 +36,10 @@ export type PersonalSettingsBackup = {
   translationModelByProviderId: Record<string, string>;
   modelSettingsById: Record<string, ModelGenerationSettings>;
   accentTheme: AccentTheme;
+  cnyPerUsd?: number;
+  pricingOverrides: SettingsState["pricingOverrides"];
+  usageRangePreference: SettingsState["usageRangePreference"];
+  usageHeatmapView: SettingsState["usageHeatmapView"];
   mcpServers: McpServerConfig[];
 };
 
@@ -50,7 +56,15 @@ export type ExportedFullBackupV3 = {
   settings: PersonalSettingsBackup;
 };
 
-export type ExportedFullBackup = ExportedFullBackupV2 | ExportedFullBackupV3;
+export type ExportedFullBackupV4 = {
+  version: 4;
+  exportedAt: number;
+  chats: BackupChats;
+  settings: PersonalSettingsBackup;
+  usageEvents: UsageEvent[];
+};
+
+export type ExportedFullBackup = ExportedFullBackupV2 | ExportedFullBackupV3 | ExportedFullBackupV4;
 
 /** 单份可导入的会话快照结构。 */
 export type ExportedChat = {
@@ -104,7 +118,8 @@ export function buildFullBackupPayload(
   conversations: Conversation[],
   messagesByConversation: Record<string, ChatMessage[]>,
   settings: SettingsState,
-): ExportedFullBackupV3 {
+  usageEvents: UsageEvent[] = [],
+): ExportedFullBackupV4 {
   const chats = conversations.map((conversation) => ({
     conversation,
     messages: messagesByConversation[conversation.id] ?? [],
@@ -114,6 +129,7 @@ export function buildFullBackupPayload(
     exportedAt: Date.now(),
     chats,
     settings: buildSettingsBackup(settings),
+    usageEvents,
   };
 }
 
@@ -136,6 +152,10 @@ export function buildSettingsBackup(settings: SettingsState): PersonalSettingsBa
     translationModelByProviderId: settings.translationModelByProviderId,
     modelSettingsById: settings.modelSettingsById,
     accentTheme: settings.accentTheme,
+    cnyPerUsd: settings.cnyPerUsd,
+    pricingOverrides: settings.pricingOverrides,
+    usageRangePreference: settings.usageRangePreference,
+    usageHeatmapView: settings.usageHeatmapView,
     mcpServers: settings.mcpServers.map((server) => sanitizeMcpServerConfig(server)),
   };
 }
@@ -153,9 +173,13 @@ export function parseImportedFullBackupJson(text: string): ExportedFullBackup {
   const data = JSON.parse(text) as unknown;
   if (!data || typeof data !== "object") throw new Error("无效的 JSON");
   const o = data as Record<string, unknown>;
-  if (o.version !== 2 && o.version !== FULL_BACKUP_VERSION) throw new Error("不是受支持的全量备份文件（version 应为 2 或 3）");
+  if (o.version !== 2 && o.version !== 3 && o.version !== FULL_BACKUP_VERSION) throw new Error("不是受支持的全量备份文件（version 应为 2、3 或 4）");
   if (!Array.isArray(o.chats)) throw new Error("缺少 chats 数组");
-  if (o.version === FULL_BACKUP_VERSION && (!o.settings || typeof o.settings !== "object")) throw new Error("version 3 备份缺少 settings");
+  if ((o.version === 3 || o.version === 4) && (!o.settings || typeof o.settings !== "object")) throw new Error(`version ${o.version} 备份缺少 settings`);
+  if (o.version === 4) {
+    if (!Array.isArray(o.usageEvents)) throw new Error("version 4 备份缺少 usageEvents");
+    return { ...(data as ExportedFullBackupV4), usageEvents: o.usageEvents.map(sanitizeUsageEvent).filter((event): event is UsageEvent => Boolean(event)) };
+  }
   return data as ExportedFullBackup;
 }
 
