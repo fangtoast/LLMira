@@ -11,7 +11,27 @@
 import type { ProviderModel } from "@llmira/contracts";
 
 export type ReasoningMode = "auto" | "low" | "medium" | "high";
-export type ModelFamily = "openai" | "anthropic" | "deepseek" | "google" | "qwen" | "glm" | "kimi" | "meta" | "other";
+export type ModelFamily =
+  | "openai"
+  | "anthropic"
+  | "deepseek"
+  | "google"
+  | "qwen"
+  | "glm"
+  | "kimi"
+  | "minimax"
+  | "meta"
+  | "mistral"
+  | "xai"
+  | "doubao"
+  | "hunyuan"
+  | "cohere"
+  | "baichuan"
+  | "yi"
+  | "stepfun"
+  | "perplexity"
+  | "xiaomi"
+  | "other";
 
 export interface ModelPresentation extends ProviderModel {
   family: ModelFamily;
@@ -28,7 +48,18 @@ export const MODEL_FAMILIES: ReadonlyArray<{ id: ModelFamily; label: string }> =
   { id: "qwen", label: "Qwen" },
   { id: "glm", label: "GLM" },
   { id: "kimi", label: "Kimi" },
+  { id: "minimax", label: "MiniMax" },
   { id: "meta", label: "Meta" },
+  { id: "mistral", label: "Mistral" },
+  { id: "xai", label: "xAI" },
+  { id: "doubao", label: "豆包" },
+  { id: "hunyuan", label: "混元" },
+  { id: "cohere", label: "Cohere" },
+  { id: "baichuan", label: "百川" },
+  { id: "yi", label: "零一万物" },
+  { id: "stepfun", label: "阶跃星辰" },
+  { id: "perplexity", label: "Perplexity" },
+  { id: "xiaomi", label: "小米" },
   { id: "other", label: "其他" },
 ];
 
@@ -37,14 +68,25 @@ const FAMILY_LABELS = new Map(MODEL_FAMILIES.map((family) => [family.id, family.
 /** 按名称、ID 与 ownedBy 识别模型家族。 */
 export function inferModelFamily(model: Pick<ProviderModel, "id" | "name" | "ownedBy">): ModelFamily {
   const value = `${model.id} ${model.name} ${model.ownedBy ?? ""}`.toLowerCase();
-  if (/openai|chatgpt|(^|[^a-z])gpt[-_\s]|(^|[^a-z])o[134](?:[-_\s]|$)/.test(value)) return "openai";
+  if (/openai|chatgpt|(^|[^a-z0-9])gpt(?:\d|[-_.\s/]|$)|(^|[^a-z0-9])o[134](?:[-_.\s/]|$)/.test(value)) return "openai";
   if (/anthropic|claude/.test(value)) return "anthropic";
   if (/deep[-_\s]?seek/.test(value)) return "deepseek";
   if (/google|gemini|gemma/.test(value)) return "google";
-  if (/qwen|tongyi|通义|千问/.test(value)) return "qwen";
-  if (/zhipu|chatglm|(^|[^a-z])glm[-_\s]?\d/.test(value)) return "glm";
+  if (/qwen|qwq|qvq|tongyi|通义|千问/.test(value)) return "qwen";
+  if (/zhipu|chatglm|(^|[^a-z0-9])glm[-_.\s]?\d/.test(value)) return "glm";
   if (/moonshot|kimi/.test(value)) return "kimi";
+  if (/minimax|(^|[^a-z0-9])abab(?:[-_.\s/]|\d|$)/.test(value)) return "minimax";
   if (/meta|llama/.test(value)) return "meta";
+  if (/mistral|mixtral|codestral|ministral|magistral/.test(value)) return "mistral";
+  if (/(^|[^a-z0-9])xai(?:[-_.\s/]|$)|grok/.test(value)) return "xai";
+  if (/doubao|bytedance|字节|豆包|(^|[^a-z0-9])ep[-_.]?\d/.test(value)) return "doubao";
+  if (/hunyuan|tencent|混元/.test(value)) return "hunyuan";
+  if (/cohere|command[-_.\s]?r/.test(value)) return "cohere";
+  if (/baichuan|百川/.test(value)) return "baichuan";
+  if (/01[._-]?ai|零一万物|(^|[^a-z0-9])yi[-_.\s/]/.test(value)) return "yi";
+  if (/stepfun|阶跃|(^|[^a-z0-9])step[-_.\s]?\d/.test(value)) return "stepfun";
+  if (/perplexity|(^|[^a-z0-9])sonar(?:[-_.\s/]|$)/.test(value)) return "perplexity";
+  if (/xiaomi|小米|(^|[^a-z0-9])mimo(?:[-_.\s/]|\d|$)/.test(value)) return "xiaomi";
   return "other";
 }
 
@@ -58,9 +100,7 @@ export function compareModelsNaturalDescending(a: Pick<ProviderModel, "id" | "na
 export function buildModelPresentations(models: ProviderModel[], favoriteIds: readonly string[]): ModelPresentation[] {
   const favorites = new Set(favoriteIds);
   const deduped = new Map<string, ProviderModel>();
-  models.forEach((model) => {
-    if (model.capabilities.chat) deduped.set(model.id, model);
-  });
+  models.forEach((model) => deduped.set(model.id, model));
   return [...deduped.values()].map((model) => {
     const family = inferModelFamily(model);
     return {

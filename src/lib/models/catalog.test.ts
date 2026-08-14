@@ -14,11 +14,36 @@ const model = (id: string, ownedBy?: string): ProviderModel => ({ providerId: "p
 
 describe("model catalog", () => {
   it("识别常见家族并将未知模型回退到其他", () => {
-    expect(inferModelFamily(model("gpt-5.5"))).toBe("openai");
-    expect(inferModelFamily(model("claude-4.1-sonnet"))).toBe("anthropic");
-    expect(inferModelFamily(model("deepseek-r1"))).toBe("deepseek");
+    const cases = [
+      ["gpt5.6", "openai"],
+      ["gpt-demo", "openai"],
+      ["claude-4.1-sonnet", "anthropic"],
+      ["deepseek-r1", "deepseek"],
+      ["gemini-3-pro", "google"],
+      ["qwq-32b", "qwen"],
+      ["glm-5", "glm"],
+      ["kimi-k2", "kimi"],
+      ["MiniMax-M2.5", "minimax"],
+      ["llama-4", "meta"],
+      ["codestral-25.01", "mistral"],
+      ["grok-4", "xai"],
+      ["doubao-seed-1.6", "doubao"],
+      ["hunyuan-t1", "hunyuan"],
+      ["command-r-plus", "cohere"],
+      ["baichuan4", "baichuan"],
+      ["yi-large", "yi"],
+      ["step-2-16k", "stepfun"],
+      ["sonar-pro", "perplexity"],
+      ["mimo-v2", "xiaomi"],
+    ] as const;
+    cases.forEach(([id, family]) => expect(inferModelFamily(model(id))).toBe(family));
     expect(inferModelFamily(model("private-model"))).toBe("other");
     expect(inferModelFamily(model("gateway-id", "moonshot"))).toBe("kimi");
+  });
+
+  it("保留图片专用模型，交由选择器按能力筛选", () => {
+    const imageOnly = { ...model("gpt-image-1"), capabilities: { ...capabilities, chat: false, imageGeneration: true } };
+    expect(buildModelPresentations([imageOnly], []).map((item) => item.id)).toEqual(["gpt-image-1"]);
   });
 
   it("收藏置顶且家族内自然数字降序", () => {

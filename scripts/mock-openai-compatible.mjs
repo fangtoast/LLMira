@@ -27,7 +27,11 @@ createServer(async (request, response) => {
   if (request.url === "/v1/models" && request.method === "GET") {
     json(response, 200, { data: [
       { id: "gpt-demo", owned_by: "mock", context_window: 128000, supports_chat: true, supports_tools: true },
+      { id: "gpt-5.6", owned_by: "openai", context_window: 128000, supports_chat: true, supports_tools: true },
       { id: "claude-demo", owned_by: "mock", context_window: 200000, supports_chat: true, supports_reasoning: true },
+      { id: "MiniMax-M2.5", owned_by: "minimax", context_window: 1000000, supports_chat: true },
+      { id: "grok-4", owned_by: "xai", context_window: 256000, supports_chat: true },
+      { id: "doubao-seed-1.6", owned_by: "bytedance", context_window: 256000, supports_chat: true },
       { id: "gpt-image-demo", owned_by: "mock", supports_chat: false, supports_image_generation: true },
     ] }); return;
   }

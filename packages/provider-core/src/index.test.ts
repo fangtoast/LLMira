@@ -28,6 +28,17 @@ describe("provider core", () => {
   it("prefers upstream capability metadata over model-name rules", () => {
     expect(inferModelCapabilities("deepseek-r1", { supports_reasoning: false }).reasoning).toBe(false);
     expect(inferModelCapabilities("private-model", { capabilities: { reasoning: true } }).reasoning).toBe(true);
+    expect(inferModelCapabilities("gpt-5.6", { supports_image_generation: false }).imageGeneration).toBe(false);
+    expect(inferModelCapabilities("gpt-5.6", { imageGeneration: false }).imageGeneration).toBe(false);
+  });
+
+  it("recognizes gateway image generators without hiding multi-purpose chat models", () => {
+    expect(inferModelCapabilities("gpt-5.5")).toMatchObject({ chat: true, imageGeneration: true });
+    expect(inferModelCapabilities("openai/gpt5.6-turbo")).toMatchObject({ chat: true, imageGeneration: true });
+    expect(inferModelCapabilities("MiniMax-M2.5")).toMatchObject({ chat: true, imageGeneration: true });
+    expect(inferModelCapabilities("gpt-image-1")).toMatchObject({ chat: false, imageGeneration: true });
+    expect(inferModelCapabilities("image-01")).toMatchObject({ chat: false, imageGeneration: true });
+    expect(inferModelCapabilities("custom-model", { output_modalities: ["text", "image"] }).imageGeneration).toBe(true);
   });
 
   it("scans GPT and Claude from one gateway", async () => {

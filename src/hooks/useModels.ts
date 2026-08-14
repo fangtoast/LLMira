@@ -85,9 +85,11 @@ function useProviderModels(): ProviderModel[] {
         });
         const state = useSettingsStore.getState();
         list.forEach((model) => state.ensureModelSettingsForModel(model.id));
-        if (list.length && !list.some((model) => model.id === state.activeModel)) state.setActiveModel(list[0]!.id);
-        if (list.length && !list.some((model) => model.id === state.activeImageModel)) {
-          state.setActiveImageModel(list.find((model) => model.capabilities.imageGeneration)?.id ?? list[0]!.id);
+        const chatModels = list.filter((model) => model.capabilities.chat);
+        const imageModels = list.filter((model) => model.capabilities.imageGeneration);
+        if (chatModels.length && !chatModels.some((model) => model.id === state.activeModel)) state.setActiveModel(chatModels[0]!.id);
+        if (imageModels.length && !imageModels.some((model) => model.id === state.activeImageModel)) {
+          state.setActiveImageModel(imageModels[0]!.id);
         }
       })
       .catch((error: unknown) => {
@@ -116,5 +118,5 @@ export function useModelCatalog(): ModelPresentation[] {
 
 /** 兼容旧展示层的模型 ID 数组入口。 */
 export function useModels(): string[] {
-  return useModelCatalog().map((model) => model.id);
+  return useModelCatalog().filter((model) => model.capabilities.chat).map((model) => model.id);
 }

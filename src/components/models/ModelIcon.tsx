@@ -17,7 +17,18 @@ const MODEL_ICON_PATHS: Partial<Record<ModelFamily, string>> = {
   qwen: "/model-icons/qwen.svg",
   glm: "/model-icons/glm.svg",
   kimi: "/model-icons/kimi.svg",
+  minimax: "/model-icons/minimax.svg",
   meta: "/model-icons/meta.svg",
+  mistral: "/model-icons/mistral.svg",
+  xai: "/model-icons/grok.svg",
+  doubao: "/model-icons/doubao.svg",
+  hunyuan: "/model-icons/hunyuan.svg",
+  cohere: "/model-icons/cohere.svg",
+  baichuan: "/model-icons/baichuan.svg",
+  yi: "/model-icons/yi.svg",
+  stepfun: "/model-icons/stepfun.svg",
+  perplexity: "/model-icons/perplexity.svg",
+  xiaomi: "/model-icons/xiaomimimo.svg",
 };
 
 /** 为模型家族渲染真实品牌标识，未知家族统一使用 Box。 */
@@ -26,7 +37,7 @@ export function ModelIcon({ family, size = 20 }: { family: ModelFamily; size?: n
   if (src) {
     // Lobe Icons SVG 是本地静态资源；保留原始品牌色和精确尺寸。
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt="" aria-hidden className={cn(["openai", "anthropic", "glm", "kimi"].includes(family) && "dark:invert")} style={{ width: size, height: size }} />;
+    return <img src={src} alt="" aria-hidden className={cn(["openai", "kimi", "xai", "xiaomi"].includes(family) && "dark:invert")} style={{ width: size, height: size }} />;
   }
   return <Box aria-hidden style={{ width: size, height: size }} />;
 }

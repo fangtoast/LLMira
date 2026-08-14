@@ -142,18 +142,39 @@ function metadataBoolean(metadata: Record<string, unknown>, keys: string[]): boo
   return undefined;
 }
 
+function metadataListIncludes(metadata: Record<string, unknown>, keys: string[], values: string[]): boolean | undefined {
+  for (const key of keys) {
+    const candidate = metadata[key];
+    if (!Array.isArray(candidate)) continue;
+    const normalized = candidate.filter((item): item is string => typeof item === "string").map((item) => item.toLowerCase());
+    if (normalized.some((item) => values.includes(item))) return true;
+  }
+  const capabilities = metadata.capabilities;
+  if (Array.isArray(capabilities)) {
+    const normalized = capabilities.filter((item): item is string => typeof item === "string").map((item) => item.toLowerCase());
+    if (normalized.some((item) => values.includes(item))) return true;
+  }
+  return undefined;
+}
+
 /** 按上游元数据优先、名称规则回退推断模型能力。 */
 export function inferModelCapabilities(id: string, metadata: Record<string, unknown> = {}): ModelCapabilities {
   const name = id.toLowerCase();
   const isEmbedding = /embed|rerank|moderation|tts|speech|whisper|transcri/.test(name);
-  const imageGenerationRule = /(^|[-_/])(dall|flux|stable-diffusion|sdxl|gpt-image|imagen|image-gen)/.test(name);
+  const isGpt55Or56 = /(^|[^a-z0-9])gpt[-_.\s]?5[._-][56](?:[^0-9]|$)/.test(name);
+  const isMiniMax = /minimax|(^|[^a-z0-9])abab(?:[-_.\s/]|\d|$)/.test(name);
+  const namedImageGenerator = /dall[-_.\s]?e|gpt[-_.\s]?image|image[-_.\s]?gen|image[-_.\s]?0?1|imagen|flux|stable[-_.\s]?diffusion|sdxl|seedream|qwen[-_.\s]?image|(^|[-_/])wan[-_.\s]?\d|kolors|recraft|ideogram|midjourney|nano[-_.\s]?banana|gemini.*image/.test(name);
+  const imageGenerationRule = !isEmbedding && (namedImageGenerator || isGpt55Or56 || isMiniMax);
+  const upstreamImageGeneration = metadataBoolean(metadata, ["imageGeneration", "image_generation", "supports_image_generation"])
+    ?? metadataListIncludes(metadata, ["output_modalities", "outputModalities"], ["image", "images"])
+    ?? metadataListIncludes(metadata, [], ["image_generation", "image-generation"]);
   return {
-    chat: metadataBoolean(metadata, ["chat", "supports_chat"]) ?? (!isEmbedding && !imageGenerationRule),
+    chat: metadataBoolean(metadata, ["chat", "supports_chat"]) ?? (!isEmbedding && !namedImageGenerator),
     vision: metadataBoolean(metadata, ["vision", "supports_vision", "multimodal"]) ?? /vision|vl|gpt-4o|gemini|claude-3/.test(name),
-    imageGeneration: metadataBoolean(metadata, ["image_generation", "supports_image_generation"]) ?? imageGenerationRule,
+    imageGeneration: upstreamImageGeneration ?? imageGenerationRule,
     reasoning: metadataBoolean(metadata, ["reasoning", "supports_reasoning"]) ?? /(^|[-_/])(o[134]|r1|reason|thinking)|gpt-5|deepseek-r1/.test(name),
     tools: metadataBoolean(metadata, ["tools", "supports_tools", "function_calling"]) ?? !isEmbedding,
-    nativeWebSearch: metadataBoolean(metadata, ["native_web_search", "web_search", "supports_web_search"]) ?? /search/.test(name),
+    nativeWebSearch: metadataBoolean(metadata, ["nativeWebSearch", "native_web_search", "web_search", "supports_web_search"]) ?? /search/.test(name),
   };
 }
 
@@ -201,7 +222,7 @@ export async function inspectOpenAICompatibleProvider(input: InspectProviderInpu
       ownedBy: typeof metadata.owned_by === "string" ? metadata.owned_by : undefined,
       contextWindow: typeof metadata.context_window === "number" ? metadata.context_window : undefined,
       capabilities: inferModelCapabilities(id, metadata),
-      source: Object.keys(metadata).some((key) => key.startsWith("supports_") || key === "capabilities") ? "upstream" : "rule",
+      source: Object.keys(metadata).some((key) => key.startsWith("supports_") || ["capabilities", "output_modalities", "outputModalities"].includes(key)) ? "upstream" : "rule",
     })),
   };
 }

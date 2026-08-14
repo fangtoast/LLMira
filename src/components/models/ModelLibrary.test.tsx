@@ -16,6 +16,8 @@ vi.mock("@/hooks/useModels", () => ({
   useModelCatalog: () => [
     { providerId: "p1", id: "gpt-5", name: "GPT-5", family: "openai", familyLabel: "OpenAI", iconKey: "openai", favorite: false, capabilities: { chat: true, vision: true, imageGeneration: false, reasoning: true, tools: true, nativeWebSearch: true }, source: "rule" },
     { providerId: "p1", id: "deepseek-r1", name: "DeepSeek R1", family: "deepseek", familyLabel: "DeepSeek", iconKey: "deepseek", favorite: false, capabilities: { chat: true, vision: false, imageGeneration: false, reasoning: true, tools: true, nativeWebSearch: false }, source: "rule" },
+    { providerId: "p1", id: "MiniMax-M2.5", name: "MiniMax M2.5", family: "minimax", familyLabel: "MiniMax", iconKey: "minimax", favorite: false, capabilities: { chat: true, vision: false, imageGeneration: true, reasoning: false, tools: true, nativeWebSearch: false }, source: "rule" },
+    { providerId: "p1", id: "gpt-image-1", name: "GPT Image 1", family: "openai", familyLabel: "OpenAI", iconKey: "openai", favorite: false, capabilities: { chat: false, vision: false, imageGeneration: true, reasoning: false, tools: false, nativeWebSearch: false }, source: "rule" },
   ],
 }));
 
@@ -53,5 +55,13 @@ describe("ModelLibrary", () => {
     render(<ModelLibrary value="gpt-5" onChange={() => undefined} />);
     fireEvent.click(screen.getByRole("button", { name: "选择模型" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("DeepSeek R1");
+  });
+
+  it("图片模式显示多用途和图片专用模型", () => {
+    render(<ModelLibrary value="MiniMax-M2.5" capability="imageGeneration" onChange={() => undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: "选择模型" }));
+    expect(screen.getByText("MiniMax M2.5")).toBeInTheDocument();
+    expect(screen.getByText("GPT Image 1")).toBeInTheDocument();
+    expect(screen.queryByText("DeepSeek R1")).not.toBeInTheDocument();
   });
 });
