@@ -133,6 +133,11 @@ function metadataBoolean(metadata: Record<string, unknown>, keys: string[]): boo
   for (const key of keys) {
     const value = metadata[key];
     if (typeof value === "boolean") return value;
+    const capabilities = metadata.capabilities;
+    if (capabilities && typeof capabilities === "object" && !Array.isArray(capabilities)) {
+      const nestedValue = (capabilities as Record<string, unknown>)[key];
+      if (typeof nestedValue === "boolean") return nestedValue;
+    }
   }
   return undefined;
 }
@@ -146,7 +151,7 @@ export function inferModelCapabilities(id: string, metadata: Record<string, unkn
     chat: metadataBoolean(metadata, ["chat", "supports_chat"]) ?? (!isEmbedding && !imageGenerationRule),
     vision: metadataBoolean(metadata, ["vision", "supports_vision", "multimodal"]) ?? /vision|vl|gpt-4o|gemini|claude-3/.test(name),
     imageGeneration: metadataBoolean(metadata, ["image_generation", "supports_image_generation"]) ?? imageGenerationRule,
-    reasoning: metadataBoolean(metadata, ["reasoning", "supports_reasoning"]) ?? /(^|[-_/])(o[134]|r1|reason|thinking)/.test(name),
+    reasoning: metadataBoolean(metadata, ["reasoning", "supports_reasoning"]) ?? /(^|[-_/])(o[134]|r1|reason|thinking)|gpt-5|deepseek-r1/.test(name),
     tools: metadataBoolean(metadata, ["tools", "supports_tools", "function_calling"]) ?? !isEmbedding,
     nativeWebSearch: metadataBoolean(metadata, ["native_web_search", "web_search", "supports_web_search"]) ?? /search/.test(name),
   };

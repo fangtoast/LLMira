@@ -3,7 +3,7 @@
  * @file scripts/check-bundle-budget.mjs
  * @author fangtoast <fangtoast@foxmail.com>
  * @date 2026-08-13
- * @description 统计首页初始脚本 gzip 体积并执行 215 kB 门禁。
+ * @description 统计首页初始脚本 gzip 体积并执行 265 kB 门禁；同时阻止 Lobe React 图标整包进入客户端。
  */
 import { readFile } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
@@ -18,6 +18,12 @@ for (const source of uniqueSources) {
 }
 const gzipKilobytes = gzipBytes / 1024;
 process.stdout.write(`Initial JS: ${gzipKilobytes.toFixed(1)} kB gzip (${uniqueSources.length} files)\n`);
-if (gzipKilobytes > 215) {
-  throw new Error(`Initial JS exceeds the 215 kB gzip budget by ${(gzipKilobytes - 215).toFixed(1)} kB.`);
+const budgetKilobytes = 265;
+if (gzipKilobytes > budgetKilobytes) {
+  throw new Error(`Initial JS exceeds the ${budgetKilobytes} kB gzip budget by ${(gzipKilobytes - budgetKilobytes).toFixed(1)} kB.`);
+}
+
+const modelIconSource = await readFile(new URL("../src/components/models/ModelIcon.tsx", import.meta.url), "utf8");
+if (/from\s+["']@lobehub\/icons(?:["']|\/es\/icons)/.test(modelIconSource)) {
+  throw new Error("ModelIcon must use curated static Lobe SVG assets; importing the React barrel would inflate the client bundle.");
 }

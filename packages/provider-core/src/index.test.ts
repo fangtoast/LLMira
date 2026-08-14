@@ -8,6 +8,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   inspectOpenAICompatibleProvider,
+  inferModelCapabilities,
   normalizeProviderBaseUrl,
   parseProviderModels,
   ProviderInspectError,
@@ -22,6 +23,11 @@ describe("provider core", () => {
   it("parses standard and nested model arrays", () => {
     expect(parseProviderModels({ data: [{ id: "gpt-5" }, { id: "claude-4" }] }).map((item) => item.id)).toEqual(["gpt-5", "claude-4"]);
     expect(parseProviderModels({ data: { models: [{ model: "deepseek-r1" }] } }).map((item) => item.id)).toEqual(["deepseek-r1"]);
+  });
+
+  it("prefers upstream capability metadata over model-name rules", () => {
+    expect(inferModelCapabilities("deepseek-r1", { supports_reasoning: false }).reasoning).toBe(false);
+    expect(inferModelCapabilities("private-model", { capabilities: { reasoning: true } }).reasoning).toBe(true);
   });
 
   it("scans GPT and Claude from one gateway", async () => {

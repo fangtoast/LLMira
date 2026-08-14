@@ -11,10 +11,14 @@
  * @description 字符上限来自 `NEXT_PUBLIC_INPUT_MAX_CHARS`。
  */
 import { useEffect, useRef, useState, type ClipboardEvent, type ClipboardEventHandler } from "react";
-import { ArrowUp, CheckCircle2, FileText, FileUp, Loader2, Square, X } from "lucide-react";
+import { ArrowUp, CheckCircle2, ChevronDown, FileText, Gauge, Globe2, Loader2, Paperclip, Plus, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LazyModelLibrary } from "@/components/models/LazyModelLibrary";
 import { Textarea } from "@/components/ui/textarea";
-import { useModels } from "@/hooks/useModels";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useModelCatalog } from "@/hooks/useModels";
 import { FILE_INPUT_ACCEPT, inferAttachmentKind } from "@/lib/files/attachmentFormat";
 import { parseAttachment } from "@/lib/files/parseAttachment";
 import { useSettingsStore } from "@/lib/store/settingsStore";
@@ -49,20 +53,13 @@ export function InputBar({
   loading: boolean;
   placement?: "bottom" | "center";
 }) {
-  const {
-    activeModel,
-    activeImageModel,
-    generationMode,
-  } = useSettingsStore();
-  const models = useModels();
-  const imageModels = models.filter((item) => /(image|mj|dall|flux|sd|gpt-image)/i.test(item));
-  const modelOptions = generationMode === "image" ? [...new Set([...imageModels, ...models])] : models;
+  const settings = useSettingsStore();
+  const { activeModel, activeImageModel, generationMode, activeApiProfileId } = settings;
+  const catalog = useModelCatalog();
   const currentModel = generationMode === "image" ? activeImageModel : activeModel;
-  const selectValue = currentModel
-    ? modelOptions.includes(currentModel)
-      ? currentModel
-      : currentModel
-    : (modelOptions[0] ?? "");
+  const selectedModel = catalog.find((model) => model.id === currentModel);
+  const reasoningSupported = generationMode === "chat" && Boolean(selectedModel?.capabilities.reasoning);
+  const reasoningMode = settings.reasoningModeByProviderModel[activeApiProfileId]?.[activeModel] ?? "auto";
   const [value, setValue] = useState("");
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [dragActive, setDragActive] = useState(false);
@@ -287,29 +284,6 @@ export function InputBar({
             ))}
           </div>
         )}
-        <div className="flex items-center justify-between gap-2 px-1">
-          <div className="min-w-0 text-xs text-muted-foreground">
-            <span className="rounded-full bg-secondary/70 px-2.5 py-1 ring-1 ring-border/50 dark:bg-white/5">
-              即将使用：<span className="font-medium text-foreground">{selectValue || "模型加载中"}</span>
-            </span>
-          </div>
-          <div className="flex shrink-0 items-center text-sm text-muted-foreground">
-            <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary/70 px-3 text-xs ring-1 ring-border/50 transition hover:bg-accent dark:bg-white/5 dark:hover:bg-white/10">
-              <FileUp className="h-3.5 w-3.5" />
-              附件
-              <input
-                type="file"
-                accept={FILE_INPUT_ACCEPT}
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  void handleUpload(e.target.files);
-                  e.currentTarget.value = "";
-                }}
-              />
-            </label>
-          </div>
-        </div>
         <div
           className={cn(
             "llmira-soft-pop w-full rounded-[28px] border border-slate-200/80 bg-white/90 px-3 py-2 backdrop-blur-xl transition-all duration-300 shadow-[0_16px_42px_rgba(15,23,42,0.14)] hover:shadow-[0_20px_50px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-[#242424]/95 dark:shadow-[0_18px_48px_rgba(0,0,0,0.34)] sm:rounded-[34px]",
@@ -331,7 +305,7 @@ export function InputBar({
               }
             }}
             placeholder={generationMode === "image" ? "描述你想生成的画面..." : "有问题，尽管问"}
-            className="min-h-[2.5rem] max-h-36 rounded-2xl border-none bg-transparent px-1 text-base leading-relaxed text-slate-900 ring-0 placeholder:text-slate-400 focus-visible:ring-0 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+            className="min-h-[2.5rem] max-h-36 resize-none rounded-2xl border-none bg-transparent px-1 text-base leading-relaxed text-slate-900 ring-0 placeholder:text-slate-400 focus-visible:ring-0 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
           {loading ? (
             <Button
@@ -355,11 +329,36 @@ export function InputBar({
             </Button>
           )}
         </div>
-        <div className="mt-1 flex items-center justify-between px-2 text-xs text-slate-500 dark:text-zinc-500">
-          <span>
-            {value.length}/{INPUT_MAX}
-          </span>
-          {hasReadingAttachments ? <span>附件读取中，完成后可发送</span> : null}
+        <div className="mt-2 flex min-w-0 items-center gap-1 px-1 text-xs text-muted-foreground">
+          <label className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-full transition hover:bg-accent hover:text-foreground" aria-label="添加附件">
+            <Paperclip className="size-4" />
+            <input type="file" accept={FILE_INPUT_ACCEPT} multiple className="hidden" onChange={(event) => {
+              void handleUpload(event.target.files);
+              event.currentTarget.value = "";
+            }} />
+          </label>
+          <Button type="button" variant="ghost" size="icon" className="size-8 rounded-full" aria-label="更多输入工具"><Plus className="size-4" /></Button>
+          <LazyModelLibrary value={currentModel} capability={generationMode === "image" ? "imageGeneration" : "chat"} align="start" onChange={(model) => generationMode === "image" ? settings.setActiveImageModel(model) : settings.setActiveModel(model)} />
+          {generationMode === "chat" ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="xs" className="rounded-full" aria-label={`联网 ${settings.webSearchMode === "off" ? "关闭" : settings.webSearchMode === "auto" ? "自动" : "开启"}`}><Globe2 aria-hidden /><span className="hidden sm:inline">联网 </span>{settings.webSearchMode === "off" ? "关闭" : settings.webSearchMode === "auto" ? "自动" : "开启"}<ChevronDown aria-hidden className="hidden sm:block" /></Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="start"><DropdownMenuLabel>联网搜索</DropdownMenuLabel>{([['off','关闭'],['auto','自动'],['on','开启']] as const).map(([mode,label]) => <DropdownMenuItem key={mode} onSelect={() => settings.setWebSearchMode(mode)}>{label}{settings.webSearchMode === mode ? <span className="ml-auto text-primary">✓</span> : null}</DropdownMenuItem>)}</DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+          {generationMode === "chat" ? (
+            <Popover>
+              <PopoverTrigger asChild><Button type="button" variant="ghost" size="xs" className="rounded-full" disabled={!reasoningSupported} aria-label={`思考 ${reasoningSupported ? (reasoningMode === "auto" ? "自动" : reasoningMode === "low" ? "快速" : reasoningMode === "medium" ? "均衡" : "深度") : "不可用"}`}><Gauge aria-hidden /><span className="hidden sm:inline">思考 </span>{reasoningSupported ? (reasoningMode === "auto" ? "自动" : reasoningMode === "low" ? "快速" : reasoningMode === "medium" ? "均衡" : "深度") : "不可用"}<ChevronDown aria-hidden className="hidden sm:block" /></Button></PopoverTrigger>
+              <PopoverContent side="top" align="end" className="w-80 rounded-2xl p-4">
+                <div className="mb-3 text-sm font-medium">思考强度</div>
+                <ToggleGroup type="single" value={reasoningMode} onValueChange={(next) => { if (next) settings.setReasoningMode(activeApiProfileId, activeModel, next as "auto" | "low" | "medium" | "high"); }} variant="outline" className="grid grid-cols-4" aria-label="思考强度">
+                  <ToggleGroupItem value="auto">自动</ToggleGroupItem><ToggleGroupItem value="low">快速</ToggleGroupItem><ToggleGroupItem value="medium">均衡</ToggleGroupItem><ToggleGroupItem value="high">深度</ToggleGroupItem>
+                </ToggleGroup>
+                <p className="mt-3 text-xs text-muted-foreground">自动不发送额外参数；更高档位可能增加响应时间和用量。</p>
+              </PopoverContent>
+            </Popover>
+          ) : null}
+          <span className="ml-auto hidden shrink-0 sm:inline">{value.length}/{INPUT_MAX}</span>
+          {hasReadingAttachments ? <span className="hidden shrink-0 sm:inline">附件读取中</span> : null}
         </div>
         </div>
       </div>

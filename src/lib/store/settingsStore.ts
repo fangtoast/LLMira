@@ -13,6 +13,7 @@ import { create } from "zustand";
 import { createJSONStorage, type StateStorage, persist } from "zustand/middleware";
 import type { ExecutionMode, ProviderModel, ProviderProtocol } from "@llmira/contracts";
 import { deleteProviderSecret, readProviderSecret, saveProviderSecret } from "@/lib/providers/runtime";
+import type { ReasoningMode } from "@/lib/models/catalog";
 
 const DEFAULT_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
 const DEFAULT_API_PROFILE_ID = "default";
@@ -149,7 +150,7 @@ function sanitizeModelSettings(input: Partial<ModelGenerationSettings>): ModelGe
   };
 }
 
-interface SettingsState {
+export interface SettingsState {
   apiKey: string;
   apiProfiles: ApiProfile[];
   activeApiProfileId: string;
@@ -162,7 +163,9 @@ interface SettingsState {
   searchProvider: "searxng" | "tavily" | "brave";
   searchBaseUrl: string;
   searchApiKey: string;
-  enableThinking: boolean;
+  favoriteModelsByProvider: Record<string, string[]>;
+  reasoningModeByProviderModel: Record<string, Record<string, ReasoningMode>>;
+  translationModelByProviderId: Record<string, string>;
   modelSettingsById: Record<string, ModelGenerationSettings>;
   temperature: number;
   topP: number;
@@ -190,7 +193,9 @@ interface SettingsState {
   setWebSearchMode: (mode: "off" | "auto" | "on") => void;
   setSearchProfile: (patch: Partial<Pick<SettingsState, "searchProvider" | "searchBaseUrl" | "searchApiKey">>) => void;
   saveSearchApiKey: (key: string) => Promise<void>;
-  setEnableThinking: (enable: boolean) => void;
+  toggleFavoriteModel: (providerId: string, modelId: string) => void;
+  setReasoningMode: (providerId: string, modelId: string, mode: ReasoningMode) => void;
+  setTranslationModel: (providerId: string, modelId: string) => void;
   ensureModelSettingsForModel: (modelId: string) => void;
   updateCurrentModelSettings: (patch: Partial<ModelGenerationSettings>) => void;
   applyCurrentSettingsToAllModels: (modelIds?: string[]) => void;
@@ -202,6 +207,35 @@ interface SettingsState {
   setSidebarCollapsed: (collapsed: boolean) => void;
   setApiKeyModalOpen: (open: boolean) => void;
   setHasCompletedOnboarding: (completed: boolean) => void;
+}
+
+/** 将旧版持久化设置升级为 v4，并清除历史明文密钥。 */
+export function migrateSettingsState(persisted: unknown) {
+  const data = (persisted ?? {}) as Partial<SettingsState> & { apiKey?: string; enableThinking?: boolean };
+  const hadLegacyPlaintextSecret = Boolean(data.apiKey) || (Array.isArray(data.apiProfiles) && data.apiProfiles.some((profile) => Boolean(profile?.apiKey)));
+  const profiles =
+    Array.isArray(data.apiProfiles) && data.apiProfiles.length
+      ? data.apiProfiles.map((profile) => sanitizeApiProfile({ ...profile, apiKey: "" }, ""))
+      : [createDefaultApiProfile("")];
+  const active = profiles.find((profile) => profile.id === data.activeApiProfileId) ?? profiles[0]!;
+  const reasoningModeByProviderModel = { ...(data.reasoningModeByProviderModel ?? {}) };
+  const activeModel = data.activeModel || "gpt-5.5";
+  reasoningModeByProviderModel[active.id] = {
+    ...(reasoningModeByProviderModel[active.id] ?? {}),
+    [activeModel]: reasoningModeByProviderModel[active.id]?.[activeModel] ?? (data.enableThinking ? "high" : "auto"),
+  };
+  const { enableThinking: _legacyEnableThinking, ...rest } = data;
+  void _legacyEnableThinking;
+  return {
+    ...rest,
+    apiProfiles: profiles,
+    activeApiProfileId: active.id,
+    apiKey: "",
+    favoriteModelsByProvider: data.favoriteModelsByProvider ?? {},
+    reasoningModeByProviderModel,
+    translationModelByProviderId: data.translationModelByProviderId ?? {},
+    hasCompletedOnboarding: hadLegacyPlaintextSecret ? false : data.hasCompletedOnboarding,
+  };
 }
 
 /** 用户级设置（含密钥与模型选择），详见 `partialize` 持久化字段。 */
@@ -220,7 +254,9 @@ export const useSettingsStore = create<SettingsState>()(
       searchProvider: "searxng",
       searchBaseUrl: "",
       searchApiKey: "",
-      enableThinking: false,
+      favoriteModelsByProvider: {},
+      reasoningModeByProviderModel: {},
+      translationModelByProviderId: {},
       modelSettingsById: {
         "gpt-5.5": DEFAULT_MODEL_GENERATION_SETTINGS,
       },
@@ -365,7 +401,31 @@ export const useSettingsStore = create<SettingsState>()(
         await saveProviderSecret(`search:${get().searchProvider}`, searchApiKey);
         set({ searchApiKey });
       },
-      setEnableThinking: (enableThinking) => set({ enableThinking }),
+      toggleFavoriteModel: (providerId, modelId) =>
+        set((state) => {
+          const current = state.favoriteModelsByProvider[providerId] ?? [];
+          const next = current.includes(modelId)
+            ? current.filter((id) => id !== modelId)
+            : [...current, modelId];
+          return { favoriteModelsByProvider: { ...state.favoriteModelsByProvider, [providerId]: next } };
+        }),
+      setReasoningMode: (providerId, modelId, mode) =>
+        set((state) => ({
+          reasoningModeByProviderModel: {
+            ...state.reasoningModeByProviderModel,
+            [providerId]: {
+              ...(state.reasoningModeByProviderModel[providerId] ?? {}),
+              [modelId]: mode,
+            },
+          },
+        })),
+      setTranslationModel: (providerId, modelId) =>
+        set((state) => ({
+          translationModelByProviderId: {
+            ...state.translationModelByProviderId,
+            [providerId]: modelId,
+          },
+        })),
       ensureModelSettingsForModel: (modelId) =>
         set((state) => {
           if (!modelId || state.modelSettingsById[modelId]) return state;
@@ -468,26 +528,9 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "huiyan-settings",
-      version: 3,
+      version: 4,
       storage,
-      migrate: (persisted) => {
-        const data = (persisted ?? {}) as Partial<SettingsState> & { apiKey?: string };
-        const hadLegacyPlaintextSecret = Boolean(data.apiKey) || (Array.isArray(data.apiProfiles) && data.apiProfiles.some((profile) => Boolean(profile?.apiKey)));
-        const profiles =
-          Array.isArray(data.apiProfiles) && data.apiProfiles.length
-            ? data.apiProfiles.map((profile) => sanitizeApiProfile({ ...profile, apiKey: "" }, ""))
-            : [createDefaultApiProfile("")];
-        const active =
-          profiles.find((profile) => profile.id === data.activeApiProfileId) ??
-          profiles[0]!;
-        return {
-          ...data,
-          apiProfiles: profiles,
-          activeApiProfileId: active.id,
-          apiKey: "",
-          hasCompletedOnboarding: hadLegacyPlaintextSecret ? false : data.hasCompletedOnboarding,
-        };
-      },
+      migrate: (persisted) => migrateSettingsState(persisted),
       partialize: (state) => ({
         apiKey: "",
         apiProfiles: state.apiProfiles.map((profile) => ({ ...profile, apiKey: "" })),
@@ -501,7 +544,9 @@ export const useSettingsStore = create<SettingsState>()(
         searchProvider: state.searchProvider,
         searchBaseUrl: state.searchBaseUrl,
         searchApiKey: "",
-        enableThinking: state.enableThinking,
+        favoriteModelsByProvider: state.favoriteModelsByProvider,
+        reasoningModeByProviderModel: state.reasoningModeByProviderModel,
+        translationModelByProviderId: state.translationModelByProviderId,
         modelSettingsById: state.modelSettingsById,
         temperature: state.temperature,
         topP: state.topP,

@@ -10,8 +10,9 @@
  */
 import { logger } from "@/lib/logger";
 import { runtimeFetch } from "@/lib/providers/runtime";
+import type { ProviderModel } from "@llmira/contracts";
 import type { TokenUsage } from "@/types";
-import { extractModelIdsFromResponse } from "./parseModelsResponse";
+import { extractModelsFromResponse } from "./parseModelsResponse";
 import type {
   ChatCompletionRequest,
   ImageGenerationRequest,
@@ -85,7 +86,7 @@ function getHeaders(profile: ApiRequestProfile) {
  *
  * @throws Error 当 HTTP 非成功或 JSON 非法时
  */
-export async function fetchModels(profile: ApiRequestProfile): Promise<string[]> {
+export async function fetchModels(profile: ApiRequestProfile): Promise<ProviderModel[]> {
   const res = await runtimeFetch(`${normalizeBaseUrl(profile.baseUrl)}/v1/models`, {
     headers: getHeaders(profile),
   });
@@ -102,14 +103,14 @@ export async function fetchModels(profile: ApiRequestProfile): Promise<string[]>
       `Invalid JSON from /v1/models: ${e instanceof Error ? e.message : String(e)} body=${bodyText.slice(0, 120)}`,
     );
   }
-  const ids = extractModelIdsFromResponse(json);
-  if (ids.length === 0) {
+  const models = extractModelsFromResponse(json, profile.id ?? "active-provider");
+  if (models.length === 0) {
     logger.warn(
       "[models] 解析后为空，请检查 /v1/models 是否兼容 OpenAI 结构。顶层键:",
       json && typeof json === "object" ? Object.keys(json as object) : typeof json,
     );
   }
-  return ids;
+  return models;
 }
 
 function isAbortError(e: unknown): boolean {

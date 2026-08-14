@@ -33,6 +33,7 @@ createServer(async (request, response) => {
   }
   if (request.url === "/v1/chat/completions" && request.method === "POST") {
     const body = await readJson(request);
+    process.stdout.write(`chat request ${JSON.stringify({ model: body.model, messageCount: Array.isArray(body.messages) ? body.messages.length : 0, reasoningEffort: body.reasoning_effort ?? null, hasWebSearch: body.web_search_options !== undefined })}\n`);
     const messages = Array.isArray(body.messages) ? body.messages : [];
     const priorAssistant = messages.slice(0, -1).filter((item) => item.role === "assistant").at(-1)?.content;
     const answer = `${body.model} 已收到 ${messages.length} 条上下文${priorAssistant ? `，并看到了先前回答“${String(priorAssistant).slice(0, 24)}”` : ""}。`;

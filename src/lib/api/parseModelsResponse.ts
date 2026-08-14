@@ -8,6 +8,9 @@
  *   - 读取环境变量预设列表
  * @description Why：各网关返回结构不一致，集中容错避免改对接层多处分支。
  */
+import type { ProviderModel } from "@llmira/contracts";
+import { inferModelCapabilities } from "@llmira/provider-core";
+
 
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
@@ -95,6 +98,59 @@ export function extractModelIdsFromResponse(json: unknown): string[] {
   if (Array.isArray(root.data_list)) walkArray(root.data_list, out);
 
   return [...out];
+}
+
+const MODEL_COLLECTION_KEYS = ["data", "models", "items", "rows", "list", "result", "data_list", "records"] as const;
+
+function collectModelEntries(value: unknown, entries: Map<string, Record<string, unknown>>) {
+  if (value == null) return;
+  if (typeof value === "string" || typeof value === "number") {
+    const id = typeof value === "number" ? String(value) : value.trim();
+    if (id && !entries.has(id)) entries.set(id, { id });
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectModelEntries(item, entries));
+    return;
+  }
+  if (typeof value !== "object") return;
+
+  const record = value as Record<string, unknown>;
+  const id = asModelIdFromObject(record);
+  if (id) {
+    const previous = entries.get(id);
+    entries.set(id, previous ? { ...previous, ...record, id } : { ...record, id });
+    return;
+  }
+  MODEL_COLLECTION_KEYS.forEach((key) => {
+    if (key in record) collectModelEntries(record[key], entries);
+  });
+}
+
+function optionalString(value: unknown): string | undefined {
+  return isNonEmptyString(value) ? value.trim() : undefined;
+}
+
+function optionalPositiveNumber(value: unknown): number | undefined {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * 解析能力完整的 Provider 模型目录。上游能力字段优先，缺失字段再由统一名称规则推断。
+ */
+export function extractModelsFromResponse(json: unknown, providerId: string): ProviderModel[] {
+  const entries = new Map<string, Record<string, unknown>>();
+  collectModelEntries(json, entries);
+  return [...entries.entries()].map(([id, metadata]) => ({
+    providerId,
+    id,
+    name: optionalString(metadata.name) ?? optionalString(metadata.display_name) ?? id,
+    capabilities: inferModelCapabilities(id, metadata),
+    contextWindow: optionalPositiveNumber(metadata.context_window ?? metadata.contextWindow),
+    ownedBy: optionalString(metadata.owned_by ?? metadata.ownedBy ?? metadata.owner),
+    source: Object.keys(metadata).some((key) => key.startsWith("supports_") || key === "capabilities") ? "upstream" : "rule",
+  }));
 }
 
 /**

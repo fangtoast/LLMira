@@ -10,11 +10,13 @@
  * @description 编排 `useChatStore`、`useConversations` 与 `lib/api/client`；会话切换时中止流。
  */
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { inferModelCapabilities } from "@llmira/provider-core";
 import { buildApiMessagesFromChat } from "@/lib/chat/buildMessages";
 import { DEFAULT_STREAM_TIMEOUT_MS, generateImage, normalizeBaseUrl, streamChatCompletion, type ApiRequestProfile } from "@/lib/api/client";
 import type { ChatCompletionRequest, ImageGenerationRequest, StreamAbortReason } from "@/lib/api/types";
 import { useChatStore } from "@/lib/store/chatStore";
 import { useSettingsStore, type ModelGenerationSettings } from "@/lib/store/settingsStore";
+import { resolveReasoningEffort, type ReasoningMode } from "@/lib/models/catalog";
 import { searchWeb } from "@/lib/search/webSearch";
 import { useConversations } from "./useConversations";
 import type { ApiRequestSnapshot, ChatAttachment, ChatMessage, ChatMessageVariant } from "@/types";
@@ -215,7 +217,8 @@ export function useChat() {
       apiProfile: ApiRequestProfile;
       chatModel: string;
       chatSettings: ModelGenerationSettings;
-      thinkingEnabled: boolean;
+      reasoningMode: ReasoningMode;
+      supportsReasoning: boolean;
       historyMessages?: ChatMessage[];
       contextWindow?: number;
       nativeWebSearch?: boolean;
@@ -231,7 +234,8 @@ export function useChat() {
         apiProfile,
         chatModel,
         chatSettings,
-        thinkingEnabled,
+        reasoningMode,
+        supportsReasoning,
         historyMessages,
         contextWindow,
         nativeWebSearch,
@@ -255,7 +259,7 @@ export function useChat() {
         apiProfile,
         {
           model: chatModel,
-          reasoning_effort: thinkingEnabled ? "high" : undefined,
+          reasoning_effort: resolveReasoningEffort(reasoningMode, supportsReasoning),
           temperature: chatSettings.temperature,
           top_p: chatSettings.topP,
           max_tokens: chatSettings.maxTokens,
@@ -270,7 +274,7 @@ export function useChat() {
             patchAssistantMessage(conversationId, assistantId, { content: acc });
           },
           onReasoningToken: (token) => {
-            if (!thinkingEnabled) return;
+            if (!supportsReasoning) return;
             thinkingAcc += token;
             patchAssistantMessage(conversationId, assistantId, { thinkingContent: thinkingAcc });
           },
@@ -454,7 +458,7 @@ export function useChat() {
       const selectedGenerationMode = settingsSnapshot.generationMode;
       const selectedChatModel = settingsSnapshot.activeModel;
       const selectedImageModel = settingsSnapshot.activeImageModel;
-      const selectedThinkingEnabled = settingsSnapshot.enableThinking;
+      const selectedReasoningMode = settingsSnapshot.reasoningModeByProviderModel[apiProfile.id]?.[selectedChatModel] ?? "auto";
       const selectedChatSettings = settingsSnapshot.modelSettingsById[selectedChatModel] ?? FALLBACK_MODEL_SETTINGS;
 
       if (!apiProfile.apiKey) {
@@ -543,7 +547,8 @@ export function useChat() {
             apiProfile,
             chatModel: selectedChatModel,
             chatSettings: selectedChatSettings,
-            thinkingEnabled: selectedThinkingEnabled,
+            reasoningMode: selectedReasoningMode,
+            supportsReasoning: selectedModelMetadata?.capabilities.reasoning ?? inferModelCapabilities(selectedChatModel).reasoning,
             contextWindow: selectedModelMetadata?.contextWindow,
             nativeWebSearch,
             evidence,
@@ -614,7 +619,7 @@ export function useChat() {
       const useImageGen = Boolean(targetAssistant.generatedImageUrls?.length) || isImageModel(targetAssistant.modelName);
       const selectedChatModel = settingsSnapshot.activeModel;
       const selectedImageModel = settingsSnapshot.activeImageModel;
-      const selectedThinkingEnabled = settingsSnapshot.enableThinking;
+      const selectedReasoningMode = settingsSnapshot.reasoningModeByProviderModel[apiProfile.id]?.[selectedChatModel] ?? "auto";
       const selectedChatSettings = settingsSnapshot.modelSettingsById[selectedChatModel] ?? FALLBACK_MODEL_SETTINGS;
 
       const existingVariants: ChatMessageVariant[] = targetAssistant.variants ?? [
@@ -658,6 +663,7 @@ export function useChat() {
             historyMessages,
           });
         } else {
+          const selectedModelMetadata = apiProfile.modelCatalog.find((model) => model.id === selectedChatModel);
           await runStreamForAssistant({
             conversationId: convId,
             assistantId: assistantMessageId,
@@ -667,8 +673,10 @@ export function useChat() {
             apiProfile,
             chatModel: selectedChatModel,
             chatSettings: selectedChatSettings,
-            thinkingEnabled: selectedThinkingEnabled,
+            reasoningMode: selectedReasoningMode,
+            supportsReasoning: selectedModelMetadata?.capabilities.reasoning ?? inferModelCapabilities(selectedChatModel).reasoning,
             historyMessages,
+            contextWindow: selectedModelMetadata?.contextWindow,
           });
         }
       } catch (error) {
@@ -752,7 +760,7 @@ export function useChat() {
       const selectedGenerationMode = settingsSnapshot.generationMode;
       const selectedChatModel = settingsSnapshot.activeModel;
       const selectedImageModel = settingsSnapshot.activeImageModel;
-      const selectedThinkingEnabled = settingsSnapshot.enableThinking;
+      const selectedReasoningMode = settingsSnapshot.reasoningModeByProviderModel[apiProfile.id]?.[selectedChatModel] ?? "auto";
       const selectedChatSettings = settingsSnapshot.modelSettingsById[selectedChatModel] ?? FALLBACK_MODEL_SETTINGS;
       const useImageGen = selectedGenerationMode === "image";
       const assistantMessage: ChatMessage = {
@@ -780,6 +788,7 @@ export function useChat() {
             apiProfile,
           });
         } else {
+          const selectedModelMetadata = apiProfile.modelCatalog.find((model) => model.id === selectedChatModel);
           await runStreamForAssistant({
             conversationId: convId,
             assistantId,
@@ -789,7 +798,9 @@ export function useChat() {
             apiProfile,
             chatModel: selectedChatModel,
             chatSettings: selectedChatSettings,
-            thinkingEnabled: selectedThinkingEnabled,
+            reasoningMode: selectedReasoningMode,
+            supportsReasoning: selectedModelMetadata?.capabilities.reasoning ?? inferModelCapabilities(selectedChatModel).reasoning,
+            contextWindow: selectedModelMetadata?.contextWindow,
           });
         }
       } catch (error) {

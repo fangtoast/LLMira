@@ -4,78 +4,94 @@
  * @project LLMira
  * @file src/hooks/useModels.ts
  * @author fangtoast <fangtoast@foxmail.com>
- * @date 2026-04-30
+ * @date 2026-08-14
  * @function
- *   - 使用显式扫描目录并兼容旧 Profile 首次补扫
- * @description 上游扫描结果是模型可用性的唯一来源；不再注入假模型。
+ *   - 扫描并规范化当前 Provider 的聊天模型目录
+ *   - 保留 useModels 字符串数组兼容入口
+ * @description 展示层通过 useModelCatalog 获取家族、能力、ownedBy 与收藏状态。
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { ProviderModel } from "@llmira/contracts";
+import { inferModelCapabilities } from "@llmira/provider-core";
 import { fetchModels } from "@/lib/api/client";
 import { getPresetModelsFromEnv } from "@/lib/api/parseModelsResponse";
+import { buildModelPresentations, type ModelPresentation } from "@/lib/models/catalog";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 
 const PRESET_MODELS = getPresetModelsFromEnv();
+const scanInFlight = new Set<string>();
+const EMPTY_FAVORITES: string[] = [];
 
-function uniqueModels(ids: string[]): string[] {
-  return [...new Set(ids.filter(Boolean))];
+function uniqueModels(models: ProviderModel[]): ProviderModel[] {
+  const unique = new Map<string, ProviderModel>();
+  models.forEach((model) => unique.set(model.id, model));
+  return [...unique.values()];
 }
 
-/**
- * @returns 模型 id 字符串数组，供 TopBar 等下拉使用
- */
-export function useModels() {
+function modelFromId(providerId: string, id: string): ProviderModel {
+  return {
+    providerId,
+    id,
+    name: id,
+    capabilities: inferModelCapabilities(id),
+    source: "rule",
+  };
+}
+
+function composeModels(providerId: string, catalog: ProviderModel[], preset: string[]): ProviderModel[] {
+  return uniqueModels([
+    ...preset.map((id) => modelFromId(providerId, id)),
+    ...PRESET_MODELS.map((id) => modelFromId(providerId, id)),
+    // 扫描目录最后合并，确保其上游元数据覆盖同名预设的名称规则结果。
+    ...catalog.map((model) => ({ ...model, capabilities: inferModelCapabilities(model.id, { ...model.capabilities }) })),
+  ]);
+}
+
+function useProviderModels(): ProviderModel[] {
   const { activeApiProfileId, apiProfiles } = useSettingsStore();
-  const [models, setModels] = useState<string[]>(PRESET_MODELS);
+  const activeProfile = apiProfiles.find((profile) => profile.id === activeApiProfileId) ?? apiProfiles[0];
+  const preset = useMemo(
+    () => activeProfile?.modelPreset
+      ?.split(/[,，\n]/g)
+      .map((item) => item.trim())
+      .filter(Boolean) ?? [],
+    [activeProfile?.modelPreset],
+  );
+  const [models, setModels] = useState<ProviderModel[]>(() =>
+    activeProfile ? composeModels(activeProfile.id, activeProfile.modelCatalog, preset) : [],
+  );
 
   useEffect(() => {
-    const { getActiveApiProfile, getActiveProfilePresetModels, setProviderScanState } = useSettingsStore.getState();
-    const activeProfile = getActiveApiProfile();
-    const profilePresetModels = getActiveProfilePresetModels();
-    const scannedModels = uniqueModels(activeProfile.modelCatalog.map((model) => model.id));
-    const explicitModels = uniqueModels([...scannedModels, ...profilePresetModels, ...PRESET_MODELS]);
-
-    if (explicitModels.length) {
-      setModels(explicitModels);
-    }
-
-    if (!activeProfile.apiKey) {
-      setModels(explicitModels);
+    if (!activeProfile) {
+      setModels([]);
       return;
     }
-    if (scannedModels.length) return;
+    const explicitModels = composeModels(activeProfile.id, activeProfile.modelCatalog, preset);
+    setModels(explicitModels);
+    if (!activeProfile.apiKey || activeProfile.modelCatalog.length || scanInFlight.has(activeProfile.id)) return;
+
+    scanInFlight.add(activeProfile.id);
     fetchModels(activeProfile)
-      .then((ids) => {
-        const list = uniqueModels(ids);
+      .then((models) => {
+        const list = uniqueModels(models);
         setModels(list);
-        setProviderScanState(activeProfile.id, {
+        useSettingsStore.getState().setProviderScanState(activeProfile.id, {
           scanStatus: "ready",
           lastScannedAt: new Date().toISOString(),
           scanError: undefined,
-          modelCatalog: list.map((id) => ({
-            providerId: activeProfile.id,
-            id,
-            name: id,
-            capabilities: { chat: true, vision: false, imageGeneration: false, reasoning: false, tools: true, nativeWebSearch: false },
-            source: "rule" as const,
-          })),
-          modelPreset: list.join(","),
+          modelCatalog: list,
+          modelPreset: list.map((model) => model.id).join(","),
           baseUrl: activeProfile.baseUrl,
         });
-
-        const { activeModel, activeImageModel, setActiveModel, setActiveImageModel, ensureModelSettingsForModel } =
-          useSettingsStore.getState();
-        list.forEach((modelId) => ensureModelSettingsForModel(modelId));
-        if (list.length && !list.includes(activeModel)) {
-          setActiveModel(list[0]!);
-        }
-        if (list.length && !list.includes(activeImageModel)) {
-          const imageList = list.filter((item) => /(image|mj|dall|flux|sd|gpt-image)/i.test(item));
-          setActiveImageModel((imageList[0] ?? list[0])!);
+        const state = useSettingsStore.getState();
+        list.forEach((model) => state.ensureModelSettingsForModel(model.id));
+        if (list.length && !list.some((model) => model.id === state.activeModel)) state.setActiveModel(list[0]!.id);
+        if (list.length && !list.some((model) => model.id === state.activeImageModel)) {
+          state.setActiveImageModel(list.find((model) => model.capabilities.imageGeneration)?.id ?? list[0]!.id);
         }
       })
       .catch((error: unknown) => {
-        setModels(explicitModels);
-        setProviderScanState(activeProfile.id, {
+        useSettingsStore.getState().setProviderScanState(activeProfile.id, {
           scanStatus: "failed",
           lastScannedAt: activeProfile.lastScannedAt,
           scanError: error instanceof Error ? error.message : "模型扫描失败",
@@ -83,8 +99,22 @@ export function useModels() {
           modelPreset: activeProfile.modelPreset,
           baseUrl: activeProfile.baseUrl,
         });
-      });
-  }, [activeApiProfileId, apiProfiles]);
+      })
+      .finally(() => scanInFlight.delete(activeProfile.id));
+  }, [activeProfile, preset]);
 
   return models;
+}
+
+/** 返回当前 Provider 的能力完整模型目录。 */
+export function useModelCatalog(): ModelPresentation[] {
+  const models = useProviderModels();
+  const activeApiProfileId = useSettingsStore((state) => state.activeApiProfileId);
+  const favoriteIds = useSettingsStore((state) => state.favoriteModelsByProvider[activeApiProfileId] ?? EMPTY_FAVORITES);
+  return useMemo(() => buildModelPresentations(models, favoriteIds), [favoriteIds, models]);
+}
+
+/** 兼容旧展示层的模型 ID 数组入口。 */
+export function useModels(): string[] {
+  return useModelCatalog().map((model) => model.id);
 }
