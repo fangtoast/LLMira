@@ -1,12 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "default",
-  "description": "LLMira main window permissions",
+  "identifier": "mobile",
+  "description": "LLMira mobile permissions without the desktop-only Stronghold migration plugin",
   "windows": ["main"],
-  "platforms": ["windows", "linux", "macOS"],
+  "platforms": ["android", "iOS"],
   "permissions": [
     "core:default",
-    "stronghold:default",
     "sql:default",
     {
       "identifier": "http:default",

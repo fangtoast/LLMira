@@ -111,7 +111,7 @@ LLMira 不复制参考项目的代码、素材或界面，只学习其公开产�
 | --- | --- |
 | 客户端 | Node.js 24.x、npm 11.6.x |
 | Windows 外壳 | Rust stable、MSVC、WebView2、WiX/NSIS |
-| Android 外壳 | JDK 17、Android SDK/NDK、Rust `aarch64-linux-android` target |
+| Android 外壳 | JDK 17、Android SDK Platform 36、Build Tools 36.0.0、NDK r27c、Platform Tools、Rust `aarch64-linux-android` target |
 | 可选团队服务 | PostgreSQL + pgvector、Redis、MinIO、Caddy |
 
 ```powershell
@@ -137,6 +137,29 @@ docker compose up -d
 | Windows 包 | `npm run tauri:build:windows` |
 | Android 包 | `npm run tauri:android:init` / `npm run tauri:build:android` |
 
+### Android 构建与 HTTP MCP 真机验收
+
+Windows 首次构建前请安装上表工具，并启用 Windows“开发者模式”；Tauri 的 Android Gradle 任务需要创建原生库符号链接，未启用时会提示 `Creation symbolic link is not allowed`。随后执行：
+
+```powershell
+rustup target add aarch64-linux-android
+npm run tauri:android:init -- --ci --skip-targets-install
+npx tauri android build --debug --apk --target aarch64 --ci
+```
+
+Android 仅支持 Streamable HTTP MCP，不提供本地 STDIO。仓库内置了不记录工具参数和结果的验收服务；连接实体设备并允许 USB 调试后，可以验证工具发现和调用：
+
+```powershell
+npm run dev:test-mcp-http
+adb devices -l
+adb reverse tcp:4120 tcp:4120
+adb install -r src-tauri/gen/android/app/build/outputs/apk/arm64/debug/app-arm64-debug.apk
+```
+
+在应用的“设置 → MCP”中新增 HTTP 服务 `http://127.0.0.1:4120/mcp`，测试连接应发现 `echo` 工具。若要验收完整聊天工具循环，可再运行 `npm run dev:mock-provider`、执行 `adb reverse tcp:4010 tcp:4010`，并将 Provider 地址设为 `http://127.0.0.1:4010`；发送消息、批准工具卡后，应看到 MCP 结果进入模型续跑。验收至少确认：设备不是模拟器、工具可发现、调用可批准、结果可续跑、停止生成可取消调用。
+
+上述 `127.0.0.1` 与明文 HTTP 只用于 USB 反向端口映射下的调试 APK。正式 Android 包应连接启用 HTTPS 的远程 MCP 服务；密钥仍只进入 Android Keystore，不写入 `localStorage`、日志或备份。
+
 ## 仓库结构
 
 ```text
@@ -148,7 +171,7 @@ LLMira/
 ├── packages/provider-core/ # OpenAI-compatible 扫描、能力与错误分类
 ├── packages/security/      # 服务端密钥加密与令牌摘要
 ├── infra/                  # Caddy、Compose 与 PostgreSQL 迁移
-├── src-tauri/              # Windows / Android 外壳、系统凭据库、Stronghold 与 SQLite
+├── src-tauri/              # Windows / Android 外壳、系统凭据库、桌面旧凭据迁移与 SQLite
 └── .github/workflows/      # 质量门禁与完整 Release 构建
 ```
 

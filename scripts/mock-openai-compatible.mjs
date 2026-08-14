@@ -37,10 +37,21 @@ createServer(async (request, response) => {
   }
   if (request.url === "/v1/chat/completions" && request.method === "POST") {
     const body = await readJson(request);
-    process.stdout.write(`chat request ${JSON.stringify({ model: body.model, messageCount: Array.isArray(body.messages) ? body.messages.length : 0, reasoningEffort: body.reasoning_effort ?? null, hasWebSearch: body.web_search_options !== undefined })}\n`);
+    process.stdout.write(`chat request ${JSON.stringify({ model: body.model, messageCount: Array.isArray(body.messages) ? body.messages.length : 0, reasoningEffort: body.reasoning_effort ?? null, hasWebSearch: body.web_search_options !== undefined, toolCount: Array.isArray(body.tools) ? body.tools.length : 0 })}\n`);
     const messages = Array.isArray(body.messages) ? body.messages : [];
+    const tool = Array.isArray(body.tools) ? body.tools[0] : undefined;
+    const toolResult = messages.findLast((item) => item.role === "tool");
+    if (tool?.function?.name && !toolResult) {
+      response.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache", "access-control-allow-origin": "*" });
+      response.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: "call-android-http-mcp", type: "function", function: { name: tool.function.name, arguments: "{\"text\":" } }] } }] })}\n\n`);
+      response.write(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "\"android-http-mcp\"}" } }] }, finish_reason: "tool_calls" }], usage: { prompt_tokens: messages.length * 8, completion_tokens: 6, total_tokens: messages.length * 8 + 6 } })}\n\n`);
+      response.end("data: [DONE]\n\n");
+      return;
+    }
     const priorAssistant = messages.slice(0, -1).filter((item) => item.role === "assistant").at(-1)?.content;
-    const answer = `${body.model} 已收到 ${messages.length} 条上下文${priorAssistant ? `，并看到了先前回答“${String(priorAssistant).slice(0, 24)}”` : ""}。`;
+    const answer = toolResult
+      ? `${body.model} 已完成 HTTP MCP 调用，工具结果为“${String(toolResult.content).slice(0, 48)}”。`
+      : `${body.model} 已收到 ${messages.length} 条上下文${priorAssistant ? `，并看到了先前回答“${String(priorAssistant).slice(0, 24)}”` : ""}。`;
     response.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache", "access-control-allow-origin": "*" });
     for (const token of answer.match(/.{1,8}/gu) ?? []) response.write(`data: ${JSON.stringify({ choices: [{ delta: { content: token } }] })}\n\n`);
     response.write(`data: ${JSON.stringify({ choices: [{ delta: {} }], usage: { prompt_tokens: messages.length * 8, completion_tokens: 12, total_tokens: messages.length * 8 + 12 } })}\n\n`);

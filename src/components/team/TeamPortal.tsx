@@ -29,7 +29,6 @@ import {
   TeamApiError,
   type TeamSession,
 } from "@/lib/team/api";
-import { readTauriRefreshToken, saveTauriRefreshToken } from "@/lib/team/tauriSecrets";
 
 type PortalState = "checking" | "unreachable" | "bootstrap" | "login" | "ready";
 
@@ -55,6 +54,8 @@ function isTauriRuntime(): boolean {
 function strongholdPassword(apiBase: string): string {
   return `llmira:${location.hostname}:${apiBase}`;
 }
+
+const loadTauriSecrets = () => import("@/lib/team/tauriSecrets");
 
 function FormField({
   id,
@@ -123,6 +124,7 @@ export function TeamPortal() {
         } catch {
           if (isTauriRuntime()) {
             try {
+              const { readTauriRefreshToken, saveTauriRefreshToken } = await loadTauriSecrets();
               const refreshToken = await readTauriRefreshToken(strongholdPassword(apiBase));
               if (refreshToken) {
                 const refreshed = await client.refreshDevice(refreshToken);
@@ -175,7 +177,10 @@ export function TeamPortal() {
           email: String(form.get("email")),
           password: String(form.get("password")),
         });
-        if ("refreshToken" in login && typeof login.refreshToken === "string") await saveTauriRefreshToken(login.refreshToken, strongholdPassword(apiBase));
+        if ("refreshToken" in login && typeof login.refreshToken === "string") {
+          const { saveTauriRefreshToken } = await loadTauriSecrets();
+          await saveTauriRefreshToken(login.refreshToken, strongholdPassword(apiBase));
+        }
         const authorized = new TeamApiClient(apiBase, login.accessToken);
         const { items } = await authorized.workspaces();
         if (!items[0]) throw new Error("当前账号还没有可访问的工作区。");

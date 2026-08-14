@@ -10,8 +10,6 @@
  */
 
 const memorySecrets = new Map<string, string>();
-const LEGACY_STRONGHOLD_CLIENT = "llmira-providers";
-const LEGACY_STRONGHOLD_PASSWORD = "llmira-device-provider-v1";
 
 /** 当前是否运行在 Tauri 2 WebView。 */
 export function isTauriRuntime(): boolean {
@@ -44,35 +42,11 @@ async function deleteNativeSecret(secretId: string): Promise<void> {
   await invoke("delete_device_secret", { account: secretAccount(secretId) });
 }
 
-/** 打开旧版固定口令 Stronghold，仅用于将已有秘密迁入系统凭据库。 */
-async function openLegacyProviderVault() {
-  const [{ Stronghold }, { appDataDir, join }] = await Promise.all([
-    import("@tauri-apps/plugin-stronghold"),
-    import("@tauri-apps/api/path"),
-  ]);
-  const snapshotPath = await join(await appDataDir(), "llmira-providers.hold");
-  const stronghold = await Stronghold.load(snapshotPath, LEGACY_STRONGHOLD_PASSWORD);
-  const client = await stronghold
-    .loadClient(LEGACY_STRONGHOLD_CLIENT)
-    .catch(() => stronghold.createClient(LEGACY_STRONGHOLD_CLIENT));
-  return { stronghold, store: client.getStore() };
-}
-
+/** 按需加载旧版 Stronghold 迁移代码。 */
 async function migrateLegacySecret(secretId: string): Promise<string | undefined> {
   try {
-    const { stronghold, store } = await openLegacyProviderVault();
-    try {
-      const key = `provider:${secretId}`;
-      const value = await store.get(key);
-      const decoded = value ? new TextDecoder().decode(value) : undefined;
-      if (!decoded) return undefined;
-      await saveNativeSecret(secretId, decoded);
-      await store.remove(key);
-      await stronghold.save();
-      return decoded;
-    } finally {
-      await stronghold.unload();
-    }
+    const { migrateLegacyProviderSecret } = await import("@/lib/providers/legacyStronghold");
+    return migrateLegacyProviderSecret(secretId, saveNativeSecret);
   } catch {
     return undefined;
   }
@@ -100,13 +74,8 @@ export async function deleteProviderSecret(providerId: string): Promise<void> {
   if (!isTauriRuntime()) return;
   await deleteNativeSecret(providerId);
   try {
-    const { stronghold, store } = await openLegacyProviderVault();
-    try {
-      await store.remove(`provider:${providerId}`);
-      await stronghold.save();
-    } finally {
-      await stronghold.unload();
-    }
+    const { deleteLegacyProviderSecret } = await import("@/lib/providers/legacyStronghold");
+    await deleteLegacyProviderSecret(providerId);
   } catch {
     // 删除不存在的旧版记录视为幂等成功。
   }

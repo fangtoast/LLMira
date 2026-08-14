@@ -18,6 +18,7 @@
     "predev": "npm run build:packages",
     "dev": "next dev",
     "dev:mock-provider": "node scripts/mock-openai-compatible.mjs",
+    "dev:test-mcp-http": "node scripts/test-mcp-http.mjs",
     "prebuild": "npm run build:packages",
     "build": "next build",
     "start": "serve out",
@@ -88,6 +89,8 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@tauri-apps/cli": "2.11.4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "16.3.2",

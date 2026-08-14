@@ -1,5 +1,6 @@
 //! LLMira Tauri 2 shell for Windows and Android.
 
+#[cfg(not(mobile))]
 use tauri::Manager;
 
 mod mcp_runtime;
@@ -44,14 +45,17 @@ pub fn run() {
                 )
                 .build(),
         )
-        .setup(|app| {
-            let salt_path = app
-                .path()
-                .app_local_data_dir()
-                .expect("could not resolve app local data path")
-                .join("stronghold-salt.txt");
-            app.handle()
-                .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
+        .setup(|_app| {
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            {
+                let salt_path = _app
+                    .path()
+                    .app_local_data_dir()
+                    .expect("could not resolve app local data path")
+                    .join("stronghold-salt.txt");
+                _app.handle()
+                    .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
