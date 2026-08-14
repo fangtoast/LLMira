@@ -41,6 +41,15 @@ describe("model catalog", () => {
     expect(inferModelFamily(model("gateway-id", "moonshot"))).toBe("kimi");
   });
 
+  it("模型名称优先于网关统一返回的 ownedBy", () => {
+    expect(inferModelFamily(model("Qwen3.8-Max", "openai"))).toBe("qwen");
+    expect(inferModelFamily(model("MiniMax-M2.7", "openai"))).toBe("minimax");
+    expect(inferModelFamily(model("DeepSeek-V4-Pro", "openai"))).toBe("deepseek");
+    expect(inferModelFamily(model("Claude-Sonnet-4.6", "openai"))).toBe("anthropic");
+    expect(inferModelFamily(model("gateway-private-model", "openai"))).toBe("other");
+    expect(inferModelFamily(model("gateway-private-model", "moonshot"))).toBe("kimi");
+  });
+
   it("保留图片专用模型，交由选择器按能力筛选", () => {
     const imageOnly = { ...model("gpt-image-1"), capabilities: { ...capabilities, chat: false, imageGeneration: true } };
     expect(buildModelPresentations([imageOnly], []).map((item) => item.id)).toEqual(["gpt-image-1"]);

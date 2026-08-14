@@ -65,9 +65,7 @@ export const MODEL_FAMILIES: ReadonlyArray<{ id: ModelFamily; label: string }> =
 
 const FAMILY_LABELS = new Map(MODEL_FAMILIES.map((family) => [family.id, family.label]));
 
-/** 按名称、ID 与 ownedBy 识别模型家族。 */
-export function inferModelFamily(model: Pick<ProviderModel, "id" | "name" | "ownedBy">): ModelFamily {
-  const value = `${model.id} ${model.name} ${model.ownedBy ?? ""}`.toLowerCase();
+function inferFamilyFromValue(value: string): ModelFamily {
   if (/openai|chatgpt|(^|[^a-z0-9])gpt(?:\d|[-_.\s/]|$)|(^|[^a-z0-9])o[134](?:[-_.\s/]|$)/.test(value)) return "openai";
   if (/anthropic|claude/.test(value)) return "anthropic";
   if (/deep[-_\s]?seek/.test(value)) return "deepseek";
@@ -88,6 +86,16 @@ export function inferModelFamily(model: Pick<ProviderModel, "id" | "name" | "own
   if (/perplexity|(^|[^a-z0-9])sonar(?:[-_.\s/]|$)/.test(value)) return "perplexity";
   if (/xiaomi|小米|(^|[^a-z0-9])mimo(?:[-_.\s/]|\d|$)/.test(value)) return "xiaomi";
   return "other";
+}
+
+/** 优先按模型 ID 与名称识别家族，仅在无法识别时使用 ownedBy 兜底。 */
+export function inferModelFamily(model: Pick<ProviderModel, "id" | "name" | "ownedBy">): ModelFamily {
+  const family = inferFamilyFromValue(`${model.id} ${model.name}`.toLowerCase());
+  if (family !== "other") return family;
+  const owner = (model.ownedBy ?? "").trim().toLowerCase();
+  // OpenAI-compatible 网关常把所有模型统一标为 openai，不能据此覆盖未知家族。
+  if (!owner || owner === "openai") return "other";
+  return inferFamilyFromValue(owner);
 }
 
 /** 模型名自然数字降序，名称相同再按 ID 降序。 */
