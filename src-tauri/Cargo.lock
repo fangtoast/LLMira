@@ -2667,7 +2667,7 @@ checksum = "11d3d7f243d5c5a8b9bb5d6dd2b1602c0cb0b9db1621bafc7ed66e35ff9fe092"
 
 [[package]]
 name = "llmira"
-version = "0.1.0"
+version = "0.2.0-dev.1"
 dependencies = [
  "serde",
  "serde_json",

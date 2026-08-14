@@ -174,10 +174,14 @@ export class MemoryTeamStore implements TeamStore {
       name: input.name,
       baseUrl: input.baseUrl,
       providerType: "openai_compatible",
+      executionMode: "server",
       scope: input.scope,
       modelPreset: input.modelPreset,
       hasSecret: Boolean(input.encryptedSecret || existing?.hasSecret),
       enabled: input.enabled,
+      scanStatus: input.modelPreset.length ? "ready" : (existing?.scanStatus ?? "never"),
+      lastScannedAt: input.modelPreset.length ? now : existing?.lastScannedAt,
+      scanError: undefined,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -186,10 +190,10 @@ export class MemoryTeamStore implements TeamStore {
     return provider;
   }
 
-  async resolveProviderCredential(organizationId: string, userId: string, workspaceId?: string): Promise<ProviderCredential | undefined> {
+  async resolveProviderCredential(organizationId: string, userId: string, workspaceId?: string, providerId?: string): Promise<ProviderCredential | undefined> {
     const profiles = await this.listProviderProfiles(organizationId, userId);
     const profile = profiles
-      .filter((item) => item.enabled && (!item.workspaceId || item.workspaceId === workspaceId))
+      .filter((item) => item.enabled && (!item.workspaceId || item.workspaceId === workspaceId) && (!providerId || item.id === providerId))
       .sort((left, right) => Number(right.ownerUserId === userId) - Number(left.ownerUserId === userId))
       .find((item) => this.providerSecrets.has(item.id));
     const encryptedSecret = profile ? this.providerSecrets.get(profile.id) : undefined;

@@ -32,5 +32,5 @@ export default defineConfig([
       "@typescript-eslint/no-explicit-any": "off",
     },
   },
-  globalIgnores([".next/**", "out/**", "apps/*/dist/**", "src-tauri/target/**"]),
+  globalIgnores([".next/**", "out/**", "apps/*/dist/**", "src-tauri/target/**", "reference/**"]),
 ]);

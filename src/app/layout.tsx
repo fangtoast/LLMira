@@ -15,7 +15,7 @@ import { BRAND_ICON_PATH, BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: BRAND_NAME,
-  description: `${BRAND_NAME} 团队 AI 工作台`,
+  description: `${BRAND_NAME} 个人多模型 AI 客户端`,
   icons: {
     icon: BRAND_ICON_PATH,
     shortcut: BRAND_ICON_PATH,

@@ -10,14 +10,13 @@
  * @description 与 `useChatStore` 同步消息列表；标题由首条用户消息推导。
  */
 import { useCallback, useMemo } from "react";
-import { bootstrapSessionFromIndexedDb } from "@/lib/chat/bootstrapSession";
 import type { ExportedChat, ExportedFullBackup } from "@/lib/chat/exportImport";
 import {
   buildFullBackupPayload,
   downloadJsonFile,
   stringifyFullBackup,
 } from "@/lib/chat/exportImport";
-import { db, type ConversationRecord } from "@/lib/db/dexie";
+import type { ConversationRecord } from "@/lib/db/dexie";
 import { useChatStore } from "@/lib/store/chatStore";
 import type { Conversation, ChatMessage } from "@/types";
 
@@ -33,6 +32,7 @@ export function useConversations() {
     useChatStore();
 
   const loadAll = useCallback(async () => {
+    const { db } = await import("@/lib/db/dexie");
     const list = await db.conversations.orderBy("updatedAt").reverse().toArray();
     setConversations(list);
     const current = useChatStore.getState().activeConversationId;
@@ -40,6 +40,7 @@ export function useConversations() {
   }, [setActiveConversationId, setConversations]);
 
   const createConversation = useCallback(async (model: string) => {
+    const { db } = await import("@/lib/db/dexie");
     const now = Date.now();
     const record: Conversation = {
       id: uid(),
@@ -55,12 +56,14 @@ export function useConversations() {
   }, [conversations, setActiveConversationId, setConversations]);
 
   const loadMessages = useCallback(async (conversationId: string) => {
+    const { db } = await import("@/lib/db/dexie");
     const messages = await db.messages.where("conversationId").equals(conversationId).toArray();
     messages.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
     setMessages(conversationId, messages);
   }, [setMessages]);
 
   const saveMessages = useCallback(async (conversationId: string, messages: ChatMessage[]) => {
+    const { db } = await import("@/lib/db/dexie");
     const payload = messages.map((item) => ({ ...item, conversationId }));
     await db.transaction("rw", db.messages, db.conversations, async () => {
       await db.messages.where("conversationId").equals(conversationId).delete();
@@ -77,12 +80,14 @@ export function useConversations() {
   }, []);
 
   const renameConversation = useCallback(async (conversationId: string, title: string) => {
+    const { db } = await import("@/lib/db/dexie");
     await db.conversations.update(conversationId, { title, keyword: title, updatedAt: Date.now() });
     await loadAll();
   }, [loadAll]);
 
   const deleteConversation = useCallback(
     async (conversationId: string) => {
+      const { db } = await import("@/lib/db/dexie");
       await db.transaction("rw", db.conversations, db.messages, async () => {
         await db.conversations.delete(conversationId);
         await db.messages.where("conversationId").equals(conversationId).delete();
@@ -101,6 +106,7 @@ export function useConversations() {
   );
 
   const exportFullBackupDownload = useCallback(async () => {
+    const { db } = await import("@/lib/db/dexie");
     const convs = await db.conversations.orderBy("updatedAt").reverse().toArray();
     const allMsgs = await db.messages.toArray();
     const byConv: Record<string, ChatMessage[]> = {};
@@ -118,6 +124,7 @@ export function useConversations() {
 
   const importFullBackupMerge = useCallback(
     async (data: ExportedFullBackup) => {
+      const { db } = await import("@/lib/db/dexie");
       const prevActive = useChatStore.getState().activeConversationId;
       await db.transaction("rw", db.conversations, db.messages, async () => {
         for (const { conversation, messages } of data.chats) {
@@ -156,6 +163,7 @@ export function useConversations() {
   );
 
   const importFullBackupReplace = useCallback(async (data: ExportedFullBackup) => {
+    const { db } = await import("@/lib/db/dexie");
     await db.transaction("rw", db.conversations, db.messages, async () => {
       await db.conversations.clear();
       await db.messages.clear();
@@ -166,10 +174,12 @@ export function useConversations() {
         await db.messages.bulkPut(payload);
       }
     });
+    const { bootstrapSessionFromIndexedDb } = await import("@/lib/chat/bootstrapSession");
     await bootstrapSessionFromIndexedDb();
   }, []);
 
   const searchConversations = useCallback(async (keyword: string) => {
+    const { db } = await import("@/lib/db/dexie");
     if (!keyword.trim()) return loadAll();
     const q = keyword.toLowerCase();
     const all = await db.conversations.toArray();
@@ -191,6 +201,7 @@ export function useConversations() {
 
   const importFromExport = useCallback(
     async (data: ExportedChat) => {
+      const { db } = await import("@/lib/db/dexie");
       const newId = uid();
       const now = Date.now();
       const record: Conversation = {

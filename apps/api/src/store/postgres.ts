@@ -291,11 +291,13 @@ export class PostgresTeamStore implements TeamStore {
     const [row] = await this.sql<any[]>`
       insert into provider_profiles (
         id, organization_id, workspace_id, owner_user_id, name, base_url,
-        provider_type, scope, encrypted_secret, model_preset, enabled
+        provider_type, execution_mode, scope, encrypted_secret, model_preset, enabled,
+        scan_status, last_scanned_at, scan_error
       ) values (
         ${id}, ${input.organizationId}, ${input.workspaceId ?? null}, ${input.ownerUserId ?? null},
-        ${input.name}, ${input.baseUrl}, 'openai_compatible', ${input.scope},
-        ${input.encryptedSecret ?? null}, ${JSON.stringify(input.modelPreset)}::jsonb, ${input.enabled}
+        ${input.name}, ${input.baseUrl}, 'openai_compatible', 'server', ${input.scope},
+        ${input.encryptedSecret ?? null}, ${JSON.stringify(input.modelPreset)}::jsonb, ${input.enabled},
+        ${input.modelPreset.length ? "ready" : "never"}, ${input.modelPreset.length ? new Date() : null}, null
       )
       on conflict (id) do update set
         name = excluded.name,
@@ -303,13 +305,16 @@ export class PostgresTeamStore implements TeamStore {
         encrypted_secret = coalesce(excluded.encrypted_secret, provider_profiles.encrypted_secret),
         model_preset = excluded.model_preset,
         enabled = excluded.enabled,
+        scan_status = case when jsonb_array_length(excluded.model_preset) > 0 then 'ready' else provider_profiles.scan_status end,
+        last_scanned_at = case when jsonb_array_length(excluded.model_preset) > 0 then now() else provider_profiles.last_scanned_at end,
+        scan_error = null,
         updated_at = now()
       returning *
     `;
     return this.mapProvider(row);
   }
 
-  async resolveProviderCredential(organizationId: string, userId: string, workspaceId?: string): Promise<ProviderCredential | undefined> {
+  async resolveProviderCredential(organizationId: string, userId: string, workspaceId?: string, providerId?: string): Promise<ProviderCredential | undefined> {
     const [row] = await this.sql<{
       id: string;
       base_url: string;
@@ -322,6 +327,7 @@ export class PostgresTeamStore implements TeamStore {
       where organization_id = ${organizationId}
         and enabled = true
         and encrypted_secret is not null
+        and (${providerId ?? null}::uuid is null or id = ${providerId ?? null})
         and (workspace_id is null or workspace_id = ${workspaceId ?? null})
         and (owner_user_id = ${userId} or (scope = 'team' and owner_user_id is null))
       order by (owner_user_id = ${userId}) desc, updated_at desc
@@ -566,10 +572,14 @@ export class PostgresTeamStore implements TeamStore {
       name: row.name,
       baseUrl: row.base_url,
       providerType: row.provider_type,
+      executionMode: row.execution_mode ?? "server",
       scope: row.scope,
       modelPreset: row.model_preset,
       hasSecret: Boolean(row.encrypted_secret),
       enabled: row.enabled,
+      scanStatus: row.scan_status ?? (row.model_preset?.length ? "ready" : "never"),
+      lastScannedAt: row.last_scanned_at ? iso(row.last_scanned_at) : undefined,
+      scanError: row.scan_error ?? undefined,
       createdAt: iso(row.created_at),
       updatedAt: iso(row.updated_at),
     };

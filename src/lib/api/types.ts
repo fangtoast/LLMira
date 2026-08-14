@@ -26,6 +26,7 @@ export interface ChatCompletionRequest {
   presence_penalty?: number;
   frequency_penalty?: number;
   reasoning_effort?: "low" | "medium" | "high";
+  web_search_options?: Record<string, unknown>;
 }
 
 export interface ModelInfo {

@@ -21,6 +21,7 @@
     "@fastify/multipart": "^9.2.1",
     "@fastify/rate-limit": "11.2.0",
     "@llmira/contracts": "*",
+    "@llmira/provider-core": "*",
     "@llmira/security": "*",
     "argon2": "0.45.1",
     "bullmq": "6.1.0",

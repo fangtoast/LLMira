@@ -1,6 +1,6 @@
 {
   "name": "@llmira/client",
-  "version": "0.1.0",
+  "version": "0.2.0-dev.1",
   "private": true,
   "packageManager": "npm@11.6.0",
   "engines": {
@@ -14,9 +14,10 @@
     "brace-expansion@1": "1.1.18"
   },
   "scripts": {
-    "build:packages": "npm run build --workspace @llmira/contracts && npm run build --workspace @llmira/security",
+    "build:packages": "npm run build --workspace @llmira/contracts && npm run build --workspace @llmira/provider-core && npm run build --workspace @llmira/security",
     "predev": "npm run build:packages",
     "dev": "next dev",
+    "dev:mock-provider": "node scripts/mock-openai-compatible.mjs",
     "prebuild": "npm run build:packages",
     "build": "next build",
     "start": "serve out",
@@ -24,7 +25,7 @@
     "pretypecheck": "npm run build:packages",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run build:packages",
-    "test": "vitest run",
+    "test": "vitest run && npm run test --workspace @llmira/provider-core && npm run test --workspace @llmira/api",
     "test:watch": "vitest",
     "test:api": "npm run test --workspace @llmira/api",
     "build:workspaces": "npm run build:packages && npm run build --workspace @llmira/api && npm run build --workspace @llmira/worker",
@@ -38,6 +39,7 @@
   },
   "dependencies": {
     "@llmira/contracts": "*",
+    "@llmira/provider-core": "*",
     "@radix-ui/react-alert-dialog": "^1.1.23",
     "@radix-ui/react-avatar": "^1.2.6",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -52,6 +54,7 @@
     "@tabler/icons-react": "^3.35.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-sql": "2.4.0",
     "@tauri-apps/plugin-stronghold": "2.3.1",
     "class-variance-authority": "^0.7.1",

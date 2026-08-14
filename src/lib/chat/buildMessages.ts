@@ -13,6 +13,36 @@ import type { ChatAttachment, ChatMessage } from "@/types";
 type ApiMsg = ChatCompletionRequest["messages"][number];
 const ATTACHMENT_CHUNK_SIZE = 12000;
 const ATTACHMENT_MAX_TOTAL_CHARS = 400000;
+const CONTEXT_BUDGET_RATIO = 0.7;
+const RECENT_TURN_COUNT = 12;
+
+export interface ContextAssembly {
+  history: ChatMessage[];
+  summary?: string;
+  trimmed: boolean;
+}
+
+function estimateMessageTokens(message: ChatMessage): number {
+  const attachmentChars = message.attachments?.reduce((sum, item) => sum + (item.textContent?.length ?? 0), 0) ?? 0;
+  return Math.ceil((message.content.length + attachmentChars + 24) / 4);
+}
+
+/**
+ * 在约 70% 上下文预算内保留完整历史；超限时摘要旧轮次并保留最近 12 轮。
+ * 这是普通上下文裁剪，不调用向量检索。
+ */
+export function assembleConversationHistory(history: ChatMessage[], contextWindow = 128_000): ContextAssembly {
+  const valid = history.filter((message) => !(message.role === "assistant" && (!message.content.trim() || message.status === "failed")));
+  const budget = Math.max(1024, Math.floor(contextWindow * CONTEXT_BUDGET_RATIO));
+  if (valid.reduce((sum, message) => sum + estimateMessageTokens(message), 0) <= budget) return { history: valid, trimmed: false };
+
+  const userIndexes = valid.flatMap((message, index) => message.role === "user" ? [index] : []);
+  const keepFrom = userIndexes[Math.max(0, userIndexes.length - RECENT_TURN_COUNT)] ?? Math.max(0, valid.length - RECENT_TURN_COUNT * 2);
+  const older = valid.slice(0, keepFrom);
+  const recent = valid.slice(keepFrom);
+  const summary = older.map((message) => `${message.role === "user" ? "用户" : message.role === "assistant" ? "助手" : message.role}：${message.content.replace(/\s+/g, " ").slice(0, 320)}`).join("\n").slice(0, Math.max(1200, Math.floor(budget * 1.5)));
+  return { history: recent, summary: summary ? `以下是更早对话的滚动摘要：\n${summary}` : undefined, trimmed: true };
+}
 
 function getAttachmentImageUrls(message: Pick<ChatMessage, "attachments" | "imageUrls">) {
   const nextImages =
@@ -102,8 +132,10 @@ export function buildApiMessagesFromChat(
   history: ChatMessage[],
   userContent: string,
   attachments: ChatAttachment[] = [],
+  options: { contextWindow?: number; evidence?: string } = {},
 ): ApiMsg[] {
-  const mapped: ApiMsg[] = history.map((item) => {
+  const context = assembleConversationHistory(history, options.contextWindow);
+  const mapped: ApiMsg[] = context.history.map((item) => {
     const imageUrls = item.role === "user" ? getAttachmentImageUrls(item) : [];
     const assistantSnapshot = getAssistantActiveSnapshot(item);
     const text = item.role === "user" ? withAttachmentText(item.content, item.attachments) : assistantSnapshot.content;
@@ -134,5 +166,8 @@ export function buildApiMessagesFromChat(
       : currentText,
   };
 
-  return [...mapped, userBlock];
+  const prefixes: ApiMsg[] = [];
+  if (context.summary) prefixes.push({ role: "system", content: context.summary });
+  if (options.evidence) prefixes.push({ role: "system", content: options.evidence });
+  return [...prefixes, ...mapped, userBlock];
 }

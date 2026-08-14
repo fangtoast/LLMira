@@ -27,6 +27,14 @@ node_modules/
 # misc
 .DS_Store
 *.pem
+.env.local
+.env.*.local
+/reference/
+
+# Local desktop secrets and databases
+*.stronghold
+*.sqlite
+*.sqlite3
 
 # debug
 npm-debug.log*

@@ -136,7 +136,7 @@ export interface TeamStore {
   createInvitation(input: CreateInvitationInput): Promise<TeamInvitation>;
   acceptInvitation(input: { tokenHash: string; displayName: string; passwordHash: string }): Promise<BootstrapResult | undefined>;
   listProviderProfiles(organizationId: string, userId: string): Promise<ProviderProfile[]>;
-  resolveProviderCredential(organizationId: string, userId: string, workspaceId?: string): Promise<ProviderCredential | undefined>;
+  resolveProviderCredential(organizationId: string, userId: string, workspaceId?: string, providerId?: string): Promise<ProviderCredential | undefined>;
   upsertProviderProfile(input: UpsertProviderInput): Promise<ProviderProfile>;
   listMcpServers(workspaceId: string): Promise<McpServer[]>;
   upsertMcpServer(input: UpsertMcpServerInput): Promise<McpServer>;

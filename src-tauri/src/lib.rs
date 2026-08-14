@@ -10,12 +10,20 @@ pub fn run() {
             tauri_plugin_sql::Builder::default()
                 .add_migrations(
                     "sqlite:llmira-cache.db",
-                    vec![tauri_plugin_sql::Migration {
-                        version: 1,
-                        description: "create offline drafts and outbox",
-                        sql: include_str!("../migrations/001_offline_cache.sql"),
-                        kind: tauri_plugin_sql::MigrationKind::Up,
-                    }],
+                    vec![
+                        tauri_plugin_sql::Migration {
+                            version: 1,
+                            description: "create offline drafts and outbox",
+                            sql: include_str!("../migrations/001_offline_cache.sql"),
+                            kind: tauri_plugin_sql::MigrationKind::Up,
+                        },
+                        tauri_plugin_sql::Migration {
+                            version: 2,
+                            description: "create personal provider chat and image runtime",
+                            sql: include_str!("../migrations/002_personal_runtime.sql"),
+                            kind: tauri_plugin_sql::MigrationKind::Up,
+                        },
+                    ],
                 )
                 .build(),
         )

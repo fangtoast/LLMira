@@ -1,7 +1,7 @@
 [package]
 name = "llmira"
-version = "0.1.0"
-description = "LLMira team AI workbench"
+version = "0.2.0-dev.1"
+description = "LLMira personal AI client with optional team collaboration"
 authors = ["fangtoast <fangtoast@foxmail.com>"]
 edition = "2021"
 

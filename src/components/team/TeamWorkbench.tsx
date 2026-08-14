@@ -71,6 +71,7 @@ interface WorkbenchProps {
   session: TeamSession;
   api: TeamApiClient;
   preview?: boolean;
+  personalMode?: boolean;
 }
 
 interface LiveRunState {
@@ -170,9 +171,11 @@ function RailButton({
 function GlobalRail({
   activeSection,
   onSectionChange,
+  personalMode,
 }: {
   activeSection: SectionId;
   onSectionChange: (section: SectionId) => void;
+  personalMode: boolean;
 }) {
   const { resolvedTheme, setTheme } = useTheme();
   return (
@@ -182,7 +185,7 @@ function GlobalRail({
         <img src="/llmira-logo.svg" alt="LLMira" className="size-7" />
       </div>
       <nav aria-label="全局功能" className="flex flex-1 flex-col items-center gap-2">
-        {NAV_ITEMS.map((item) => (
+        {NAV_ITEMS.filter((item) => !personalMode || item.id !== "team").map((item) => (
           <RailButton
             key={item.id}
             label={item.label}
@@ -638,10 +641,10 @@ function ActivityPanel({
   );
 }
 
-function MobileNavigation({ active, onChange }: { active: SectionId; onChange: (value: SectionId) => void }) {
+function MobileNavigation({ active, onChange, personalMode }: { active: SectionId; onChange: (value: SectionId) => void; personalMode: boolean }) {
   return (
     <nav aria-label="移动端主导航" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border/80 bg-workbench-panel/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-      {MOBILE_NAV.map((item) => {
+      {MOBILE_NAV.filter((item) => !personalMode || item.id !== "team").map((item) => {
         const MobileIcon = item.icon;
         return (
           <button key={item.id} type="button" onClick={() => onChange(item.id)} aria-current={active === item.id ? "page" : undefined} className={cn("flex min-h-[58px] flex-col items-center justify-center gap-1 text-[10px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring", active === item.id && "text-primary")}>
@@ -654,7 +657,7 @@ function MobileNavigation({ active, onChange }: { active: SectionId; onChange: (
 }
 
 /** 已登录团队工作台。 */
-export function TeamWorkbench({ session, api, preview = false }: WorkbenchProps) {
+export function TeamWorkbench({ session, api, preview = false, personalMode = false }: WorkbenchProps) {
   const [activeSection, setActiveSection] = React.useState<SectionId>("knowledge");
   const [sourceOpen, setSourceOpen] = React.useState(false);
   const [activityOpen, setActivityOpen] = React.useState(false);
@@ -780,7 +783,7 @@ export function TeamWorkbench({ session, api, preview = false }: WorkbenchProps)
 
   return (
     <main className="flex h-dvh min-h-[640px] overflow-hidden bg-workbench-canvas text-foreground">
-      <GlobalRail activeSection={activeSection} onSectionChange={setActiveSection} />
+      <GlobalRail activeSection={activeSection} onSectionChange={setActiveSection} personalMode={personalMode} />
       <KnowledgeTree workspaceName={session.workspace.name} onOpenSources={() => openSource(0)} />
 
       <section className="relative flex min-w-0 flex-1 flex-col">
@@ -794,7 +797,7 @@ export function TeamWorkbench({ session, api, preview = false }: WorkbenchProps)
               <span className="truncate text-sm font-medium">{activeSection === "knowledge" ? "Tauri 2 跨端方案" : NAV_ITEMS.find((item) => item.id === activeSection)?.label}</span>
             </div>
           </div>
-          <Badge variant="outline" className="hidden border-success/25 bg-success/8 text-success sm:inline-flex"><span aria-hidden className="mr-1.5 size-1.5 rounded-full bg-success" />已同步</Badge>
+          <Badge variant="outline" className="hidden border-success/25 bg-success/8 text-success sm:inline-flex"><span aria-hidden className="mr-1.5 size-1.5 rounded-full bg-success" />{preview ? "演示数据" : "已同步"}</Badge>
           <Button type="button" variant="ghost" size="icon" aria-label="打开协作与授权" title="打开协作与授权" onClick={() => setActivityOpen(true)} className="min-[1280px]:hidden"><IconLayoutSidebarRightExpand aria-hidden size={20} /></Button>
         </header>
 
@@ -886,7 +889,7 @@ export function TeamWorkbench({ session, api, preview = false }: WorkbenchProps)
         </SheetContent>
       </Sheet>
 
-      <MobileNavigation active={activeSection} onChange={setActiveSection} />
+      <MobileNavigation active={activeSection} onChange={setActiveSection} personalMode={personalMode} />
     </main>
   );
 }

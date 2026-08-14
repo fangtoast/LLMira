@@ -26,6 +26,7 @@ import {
   migrationImportSchema,
   type ToolRisk,
 } from "@llmira/contracts";
+import { inferModelCapabilities, inspectOpenAICompatibleProvider } from "@llmira/provider-core";
 import { decryptSecret, encryptSecret, hashToken } from "@llmira/security";
 import { authCookies, hashRefreshToken, issueSession, requireAuth } from "./auth.js";
 import type { ApiConfig } from "./config.js";
@@ -68,6 +69,12 @@ const providerSchema = z.object({
   apiKey: z.string().min(8).max(10_000).optional(),
   modelPreset: z.array(z.string().trim().min(1).max(200)).max(200).default([]),
   enabled: z.boolean().default(true),
+});
+
+const providerInspectSchema = z.object({
+  providerId: z.string().uuid().optional(),
+  baseUrl: z.url(),
+  apiKey: z.string().min(1).max(10_000),
 });
 
 const mcpServerSchema = z.object({
@@ -135,6 +142,7 @@ const allowedDocumentExtensions: Record<string, string[]> = {
 };
 
 const gatewayWorkspaceHeader = z.string().uuid();
+const gatewayProviderHeader = z.string().uuid().optional();
 const gatewayBodySchema = z.object({ model: z.string().trim().min(1).max(200) }).passthrough();
 
 function toolRisk(toolName: string): ToolRisk {
@@ -165,7 +173,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   const resolveGateway = async (request: FastifyRequest) => {
     const workspaceId = gatewayWorkspaceHeader.parse(request.headers["x-llmira-workspace-id"]);
     await store.requireWorkspaceRole(request.principal!.userId, workspaceId, ["org_admin", "workspace_owner", "editor", "viewer"]);
-    const provider = await store.resolveProviderCredential(request.principal!.organizationId, request.principal!.userId, workspaceId);
+    const providerId = gatewayProviderHeader.parse(request.headers["x-llmira-provider-id"]);
+    const provider = await store.resolveProviderCredential(request.principal!.organizationId, request.principal!.userId, workspaceId, providerId);
     if (!provider) throw new Error("PROVIDER_NOT_CONFIGURED");
     return { workspaceId, provider, apiKey: decryptSecret(provider.encryptedSecret, config.encryptionKey) };
   };
@@ -294,6 +303,17 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     })),
   );
 
+  app.post("/api/v1/providers/inspect", { preHandler: requireAuth }, async (request, reply) => {
+    const input = providerInspectSchema.parse(request.body);
+    const result = await inspectOpenAICompatibleProvider({
+      providerId: input.providerId ?? uuidv7(),
+      baseUrl: input.baseUrl,
+      apiKey: input.apiKey,
+      allowInsecureLocalhost: config.nodeEnv !== "production",
+    });
+    return reply.send(result);
+  });
+
   app.post("/api/v1/providers", { preHandler: requireAuth }, async (request, reply) => {
     return store.runAsUser(request.principal!.userId, async () => {
       const input = providerSchema.parse(request.body);
@@ -317,6 +337,59 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       });
       await store.appendAudit({ workspaceId: input.workspaceId, actorUserId: request.principal!.userId, action: `provider.${input.scope}.upsert`, targetType: "provider_profile", targetId: profile.id, redactedInput: { name: input.name, baseUrl: input.baseUrl, apiKey: input.apiKey ? "[REDACTED]" : undefined }, resultSummary: "saved" });
       return reply.code(input.id ? 200 : 201).send(profile);
+    });
+  });
+
+  app.post("/api/v1/providers/:providerId/refresh-models", { preHandler: requireAuth }, async (request, reply) => {
+    return store.runAsUser(request.principal!.userId, async () => {
+      const { providerId } = z.object({ providerId: z.string().uuid() }).parse(request.params);
+      const query = z.object({ workspaceId: z.string().uuid().optional() }).parse(request.query);
+      if (query.workspaceId) {
+        await store.requireWorkspaceRole(request.principal!.userId, query.workspaceId, ["org_admin", "workspace_owner", "editor", "viewer"]);
+      }
+      const credential = await store.resolveProviderCredential(request.principal!.organizationId, request.principal!.userId, query.workspaceId, providerId);
+      if (!credential) return reply.code(404).send({ error: { code: "PROVIDER_NOT_FOUND", message: "Provider 不存在或无权访问。", requestId: request.id } });
+      const profile = (await store.listProviderProfiles(request.principal!.organizationId, request.principal!.userId)).find((item) => item.id === providerId);
+      if (!profile) return reply.code(404).send({ error: { code: "PROVIDER_NOT_FOUND", message: "Provider 不存在或无权访问。", requestId: request.id } });
+      const scanned = await inspectOpenAICompatibleProvider({
+        providerId,
+        baseUrl: credential.baseUrl,
+        apiKey: decryptSecret(credential.encryptedSecret, config.encryptionKey),
+        allowInsecureLocalhost: config.nodeEnv !== "production",
+      });
+      const updated = await store.upsertProviderProfile({
+        id: profile.id,
+        organizationId: request.principal!.organizationId,
+        workspaceId: profile.workspaceId,
+        ownerUserId: profile.ownerUserId,
+        name: profile.name,
+        baseUrl: scanned.normalizedBaseUrl,
+        scope: profile.scope,
+        modelPreset: scanned.models.map((model) => model.id),
+        enabled: profile.enabled,
+      });
+      return reply.send({ provider: updated, models: scanned.models });
+    });
+  });
+
+  app.get("/api/v1/models", { preHandler: requireAuth }, async (request) => {
+    return store.runAsUser(request.principal!.userId, async () => {
+      const query = z.object({ workspaceId: z.string().uuid().optional() }).parse(request.query);
+      if (query.workspaceId) {
+        await store.requireWorkspaceRole(request.principal!.userId, query.workspaceId, ["org_admin", "workspace_owner", "editor", "viewer"]);
+      }
+      const profiles = await store.listProviderProfiles(request.principal!.organizationId, request.principal!.userId);
+      return {
+        items: profiles
+          .filter((provider) => provider.enabled && provider.hasSecret && (!provider.workspaceId || provider.workspaceId === query.workspaceId))
+          .flatMap((provider) => provider.modelPreset.map((id) => ({
+            providerId: provider.id,
+            id,
+            name: id,
+            capabilities: inferModelCapabilities(id),
+            source: "rule" as const,
+          }))),
+      };
     });
   });
 

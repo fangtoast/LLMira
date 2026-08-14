@@ -6,8 +6,8 @@
  * @author fangtoast <fangtoast@foxmail.com>
  * @date 2026-04-30
  * @function
- *   - 拉取并合并远程模型列表与环境预设
- * @description 依赖当前 API Profile；列表过少时用环境或 Profile 预设补足。
+ *   - 使用显式扫描目录并兼容旧 Profile 首次补扫
+ * @description 上游扫描结果是模型可用性的唯一来源；不再注入假模型。
  */
 import { useEffect, useState } from "react";
 import { fetchModels } from "@/lib/api/client";
@@ -16,16 +16,8 @@ import { useSettingsStore } from "@/lib/store/settingsStore";
 
 const PRESET_MODELS = getPresetModelsFromEnv();
 
-const ULTIMATE_FALLBACK = ["gpt-5-chat"] as const;
-
-function mergeWithPresetWhenSparse(ids: string[], profilePresetModels: string[]): string[] {
-  const unique = [...new Set(ids.filter(Boolean))];
-  if (unique.length >= 2) return unique;
-  const presetModels = [...new Set([...profilePresetModels, ...PRESET_MODELS])];
-  if (presetModels.length > 0) {
-    return [...new Set([...unique, ...presetModels])];
-  }
-  return unique.length > 0 ? unique : [...ULTIMATE_FALLBACK];
+function uniqueModels(ids: string[]): string[] {
+  return [...new Set(ids.filter(Boolean))];
 }
 
 /**
@@ -33,24 +25,42 @@ function mergeWithPresetWhenSparse(ids: string[], profilePresetModels: string[])
  */
 export function useModels() {
   const { activeApiProfileId, apiProfiles } = useSettingsStore();
-  const [models, setModels] = useState<string[]>(() =>
-    PRESET_MODELS.length > 0 ? PRESET_MODELS : [...ULTIMATE_FALLBACK],
-  );
+  const [models, setModels] = useState<string[]>(PRESET_MODELS);
 
   useEffect(() => {
-    const { getActiveApiProfile, getActiveProfilePresetModels } = useSettingsStore.getState();
+    const { getActiveApiProfile, getActiveProfilePresetModels, setProviderScanState } = useSettingsStore.getState();
     const activeProfile = getActiveApiProfile();
     const profilePresetModels = getActiveProfilePresetModels();
-    const fallbackModels = mergeWithPresetWhenSparse([], profilePresetModels);
+    const scannedModels = uniqueModels(activeProfile.modelCatalog.map((model) => model.id));
+    const explicitModels = uniqueModels([...scannedModels, ...profilePresetModels, ...PRESET_MODELS]);
+
+    if (explicitModels.length) {
+      setModels(explicitModels);
+    }
 
     if (!activeProfile.apiKey) {
-      setModels(fallbackModels);
+      setModels(explicitModels);
       return;
     }
+    if (scannedModels.length) return;
     fetchModels(activeProfile)
       .then((ids) => {
-        const list = mergeWithPresetWhenSparse(ids, profilePresetModels);
+        const list = uniqueModels(ids);
         setModels(list);
+        setProviderScanState(activeProfile.id, {
+          scanStatus: "ready",
+          lastScannedAt: new Date().toISOString(),
+          scanError: undefined,
+          modelCatalog: list.map((id) => ({
+            providerId: activeProfile.id,
+            id,
+            name: id,
+            capabilities: { chat: true, vision: false, imageGeneration: false, reasoning: false, tools: true, nativeWebSearch: false },
+            source: "rule" as const,
+          })),
+          modelPreset: list.join(","),
+          baseUrl: activeProfile.baseUrl,
+        });
 
         const { activeModel, activeImageModel, setActiveModel, setActiveImageModel, ensureModelSettingsForModel } =
           useSettingsStore.getState();
@@ -63,19 +73,16 @@ export function useModels() {
           setActiveImageModel((imageList[0] ?? list[0])!);
         }
       })
-      .catch(() => {
-        const fallback = fallbackModels;
-        setModels(fallback);
-        const { activeModel, activeImageModel, setActiveModel, setActiveImageModel, ensureModelSettingsForModel } =
-          useSettingsStore.getState();
-        fallback.forEach((modelId) => ensureModelSettingsForModel(modelId));
-        if (fallback.length) {
-          if (!fallback.includes(activeModel)) setActiveModel(fallback[0]!);
-          if (!fallback.includes(activeImageModel)) {
-            const imageList = fallback.filter((m) => /(image|mj|dall|flux|sd|gpt-image)/i.test(m));
-            setActiveImageModel((imageList[0] ?? fallback[0])!);
-          }
-        }
+      .catch((error: unknown) => {
+        setModels(explicitModels);
+        setProviderScanState(activeProfile.id, {
+          scanStatus: "failed",
+          lastScannedAt: activeProfile.lastScannedAt,
+          scanError: error instanceof Error ? error.message : "模型扫描失败",
+          modelCatalog: activeProfile.modelCatalog,
+          modelPreset: activeProfile.modelPreset,
+          baseUrl: activeProfile.baseUrl,
+        });
       });
   }, [activeApiProfileId, apiProfiles]);
 

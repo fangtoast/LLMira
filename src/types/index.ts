@@ -9,7 +9,19 @@
  */
 
 /** 消息发送方角色（协议层）。 */
-export type ChatRole = "system" | "user" | "assistant";
+export type ChatRole = "system" | "user" | "assistant" | "tool";
+
+/** 普通聊天消息状态；与 AgentRun 状态机相互独立。 */
+export type ChatMessageStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "partial";
+
+/** 联网只读证据，序号与回答中的引用卡片一致。 */
+export interface WebCitation {
+  index: number;
+  title: string;
+  url: string;
+  snippet: string;
+  fetchedAt: string;
+}
 
 /** 用户上传附件的解析结果；正文会随消息持久化到 IndexedDB。 */
 export interface ChatAttachment {
@@ -42,6 +54,7 @@ export interface ChatMessageVariant {
 /** 单次请求快照；仅保存可调试字段，不保存 API Key。 */
 export interface ApiRequestSnapshot {
   kind: "chat" | "image";
+  providerId?: string;
   baseUrl: string;
   endpoint: string;
   body: unknown;
@@ -55,6 +68,8 @@ export interface ChatMessage {
   senderName?: string;
   senderAvatar?: string;
   modelName?: string;
+  providerId?: string;
+  status?: ChatMessageStatus;
   content: string;
   thinkingContent?: string;
   createdAt: number;
@@ -63,6 +78,7 @@ export interface ChatMessage {
   /** @deprecated 旧版图片附件字段；新逻辑优先使用 `attachments`。 */
   imageUrls?: string[];
   generatedImageUrls?: string[];
+  citations?: WebCitation[];
   /** 最近一次实际发送的请求体快照，便于核对模型与中转站。 */
   requestSnapshot?: ApiRequestSnapshot;
   /** 重新生成时保留的历史版本快照（按生成顺序，0-based）。 */

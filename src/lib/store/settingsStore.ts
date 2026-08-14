@@ -6,11 +6,13 @@
  * @author fangtoast <fangtoast@foxmail.com>
  * @date 2026-04-30
  * @function
- *   - API Key、模型、生成参数、侧栏状态等持久化设置
- * @description Zustand persist → localStorage；SSR 使用内存 storage 占位。
+ *   - Provider 元数据、模型、生成参数、侧栏状态等持久化设置
+ * @description localStorage 只保存非敏感元数据；设备密钥由 Stronghold 适配器按需注入内存。
  */
 import { create } from "zustand";
 import { createJSONStorage, type StateStorage, persist } from "zustand/middleware";
+import type { ExecutionMode, ProviderModel, ProviderProtocol } from "@llmira/contracts";
+import { deleteProviderSecret, readProviderSecret, saveProviderSecret } from "@/lib/providers/runtime";
 
 const DEFAULT_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
 const DEFAULT_API_PROFILE_ID = "default";
@@ -63,6 +65,12 @@ export type ApiProfile = {
   baseUrl: string;
   apiKey: string;
   modelPreset: string;
+  protocol: ProviderProtocol;
+  executionMode: ExecutionMode;
+  scanStatus: "never" | "scanning" | "ready" | "failed";
+  lastScannedAt?: string;
+  scanError?: string;
+  modelCatalog: ProviderModel[];
 };
 
 const DEFAULT_MODEL_GENERATION_SETTINGS: ModelGenerationSettings = {
@@ -91,6 +99,10 @@ function createDefaultApiProfile(apiKey = ""): ApiProfile {
     baseUrl: normalizeApiBaseUrl(DEFAULT_API_BASE_URL),
     apiKey,
     modelPreset: process.env.NEXT_PUBLIC_MODEL_PRESET ?? "",
+    protocol: "openai_compatible",
+    executionMode: "device",
+    scanStatus: "never",
+    modelCatalog: [],
   };
 }
 
@@ -107,6 +119,12 @@ function sanitizeApiProfile(input: Partial<ApiProfile> | undefined, fallbackApiK
     baseUrl: normalizeApiBaseUrl(input?.baseUrl ?? fallback.baseUrl),
     apiKey: input?.apiKey ?? fallback.apiKey,
     modelPreset: input?.modelPreset ?? fallback.modelPreset,
+    protocol: "openai_compatible",
+    executionMode: input?.executionMode ?? fallback.executionMode,
+    scanStatus: input?.scanStatus ?? fallback.scanStatus,
+    lastScannedAt: input?.lastScannedAt,
+    scanError: input?.scanError,
+    modelCatalog: Array.isArray(input?.modelCatalog) ? input.modelCatalog : [],
   };
 }
 
@@ -140,6 +158,10 @@ interface SettingsState {
   activeModel: string;
   activeImageModel: string;
   generationMode: "chat" | "image";
+  webSearchMode: "off" | "auto" | "on";
+  searchProvider: "searxng" | "tavily" | "brave";
+  searchBaseUrl: string;
+  searchApiKey: string;
   enableThinking: boolean;
   modelSettingsById: Record<string, ModelGenerationSettings>;
   temperature: number;
@@ -151,6 +173,9 @@ interface SettingsState {
   apiKeyModalOpen: boolean;
   hasCompletedOnboarding: boolean;
   setApiKey: (key: string) => void;
+  saveActiveApiKey: (key: string) => Promise<void>;
+  hydrateProviderSecrets: () => Promise<void>;
+  setProviderScanState: (profileId: string, state: Pick<ApiProfile, "scanStatus" | "lastScannedAt" | "scanError" | "modelCatalog" | "modelPreset" | "baseUrl">) => void;
   setActiveApiProfileId: (profileId: string) => void;
   addApiProfile: () => string;
   updateApiProfile: (profileId: string, patch: Partial<Omit<ApiProfile, "id">>) => void;
@@ -162,6 +187,9 @@ interface SettingsState {
   setActiveModel: (model: string) => void;
   setActiveImageModel: (model: string) => void;
   setGenerationMode: (mode: "chat" | "image") => void;
+  setWebSearchMode: (mode: "off" | "auto" | "on") => void;
+  setSearchProfile: (patch: Partial<Pick<SettingsState, "searchProvider" | "searchBaseUrl" | "searchApiKey">>) => void;
+  saveSearchApiKey: (key: string) => Promise<void>;
   setEnableThinking: (enable: boolean) => void;
   ensureModelSettingsForModel: (modelId: string) => void;
   updateCurrentModelSettings: (patch: Partial<ModelGenerationSettings>) => void;
@@ -188,6 +216,10 @@ export const useSettingsStore = create<SettingsState>()(
       activeModel: "gpt-5.5",
       activeImageModel: "gpt-image-1",
       generationMode: "chat",
+      webSearchMode: "off",
+      searchProvider: "searxng",
+      searchBaseUrl: "",
+      searchApiKey: "",
       enableThinking: false,
       modelSettingsById: {
         "gpt-5.5": DEFAULT_MODEL_GENERATION_SETTINGS,
@@ -210,6 +242,28 @@ export const useSettingsStore = create<SettingsState>()(
             ),
           };
         }),
+      saveActiveApiKey: async (apiKey) => {
+        const activeId = get().activeApiProfileId;
+        await saveProviderSecret(activeId, apiKey);
+        get().setApiKey(apiKey);
+      },
+      hydrateProviderSecrets: async () => {
+        const state = get();
+        const [loaded, searchSecret] = await Promise.all([
+          Promise.all(state.apiProfiles.map(async (profile) => [profile.id, await readProviderSecret(profile.id)] as const)),
+          readProviderSecret(`search:${state.searchProvider}`),
+        ]);
+        const secrets = new Map(loaded.filter((item): item is readonly [string, string] => Boolean(item[1])));
+        if (!secrets.size && !searchSecret) return;
+        set((current) => {
+          const apiProfiles = current.apiProfiles.map((profile) => ({ ...profile, apiKey: secrets.get(profile.id) ?? "" }));
+          const active = apiProfiles.find((profile) => profile.id === current.activeApiProfileId) ?? apiProfiles[0];
+          return { apiProfiles, apiKey: active?.apiKey ?? "", searchApiKey: searchSecret ?? "" };
+        });
+      },
+      setProviderScanState: (profileId, scan) => set((state) => ({
+        apiProfiles: state.apiProfiles.map((profile) => profile.id === profileId ? { ...profile, ...scan } : profile),
+      })),
       setActiveApiProfileId: (activeApiProfileId) =>
         set((state) => {
           const profile = state.apiProfiles.find((item) => item.id === activeApiProfileId) ?? state.apiProfiles[0];
@@ -228,6 +282,10 @@ export const useSettingsStore = create<SettingsState>()(
             baseUrl: normalizeApiBaseUrl(DEFAULT_API_BASE_URL),
             apiKey: "",
             modelPreset: "",
+            protocol: "openai_compatible",
+            executionMode: "device",
+            scanStatus: "never",
+            modelCatalog: [],
           };
           return {
             apiProfiles: [...state.apiProfiles, profile],
@@ -258,7 +316,8 @@ export const useSettingsStore = create<SettingsState>()(
             apiKey: active.apiKey,
           };
         }),
-      deleteApiProfile: (profileId) =>
+      deleteApiProfile: (profileId) => {
+        void deleteProviderSecret(profileId);
         set((state) => {
           const profiles = state.apiProfiles.length ? state.apiProfiles : [createDefaultApiProfile(state.apiKey)];
           if (profiles.length <= 1) return state;
@@ -272,7 +331,8 @@ export const useSettingsStore = create<SettingsState>()(
             activeApiProfileId: active.id,
             apiKey: active.apiKey,
           };
-        }),
+        });
+      },
       getActiveApiProfile: () => {
         const state = get();
         return (
@@ -299,6 +359,12 @@ export const useSettingsStore = create<SettingsState>()(
         }),
       setActiveImageModel: (activeImageModel) => set({ activeImageModel }),
       setGenerationMode: (generationMode) => set({ generationMode }),
+      setWebSearchMode: (webSearchMode) => set({ webSearchMode }),
+      setSearchProfile: (patch) => set(patch),
+      saveSearchApiKey: async (searchApiKey) => {
+        await saveProviderSecret(`search:${get().searchProvider}`, searchApiKey);
+        set({ searchApiKey });
+      },
       setEnableThinking: (enableThinking) => set({ enableThinking }),
       ensureModelSettingsForModel: (modelId) =>
         set((state) => {
@@ -402,14 +468,15 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "huiyan-settings",
-      version: 2,
+      version: 3,
       storage,
       migrate: (persisted) => {
         const data = (persisted ?? {}) as Partial<SettingsState> & { apiKey?: string };
+        const hadLegacyPlaintextSecret = Boolean(data.apiKey) || (Array.isArray(data.apiProfiles) && data.apiProfiles.some((profile) => Boolean(profile?.apiKey)));
         const profiles =
           Array.isArray(data.apiProfiles) && data.apiProfiles.length
-            ? data.apiProfiles.map((profile) => sanitizeApiProfile(profile, data.apiKey ?? ""))
-            : [createDefaultApiProfile(data.apiKey ?? "")];
+            ? data.apiProfiles.map((profile) => sanitizeApiProfile({ ...profile, apiKey: "" }, ""))
+            : [createDefaultApiProfile("")];
         const active =
           profiles.find((profile) => profile.id === data.activeApiProfileId) ??
           profiles[0]!;
@@ -417,18 +484,23 @@ export const useSettingsStore = create<SettingsState>()(
           ...data,
           apiProfiles: profiles,
           activeApiProfileId: active.id,
-          apiKey: active.apiKey,
+          apiKey: "",
+          hasCompletedOnboarding: hadLegacyPlaintextSecret ? false : data.hasCompletedOnboarding,
         };
       },
       partialize: (state) => ({
-        apiKey: state.apiKey,
-        apiProfiles: state.apiProfiles,
+        apiKey: "",
+        apiProfiles: state.apiProfiles.map((profile) => ({ ...profile, apiKey: "" })),
         activeApiProfileId: state.activeApiProfileId,
         userName: state.userName,
         userAvatarText: state.userAvatarText,
         activeModel: state.activeModel,
         activeImageModel: state.activeImageModel,
         generationMode: state.generationMode,
+        webSearchMode: state.webSearchMode,
+        searchProvider: state.searchProvider,
+        searchBaseUrl: state.searchBaseUrl,
+        searchApiKey: "",
         enableThinking: state.enableThinking,
         modelSettingsById: state.modelSettingsById,
         temperature: state.temperature,

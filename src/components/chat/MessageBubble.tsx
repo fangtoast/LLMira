@@ -10,14 +10,22 @@
  * @description 助手侧解析遗留 `<think>` 标签展示思考内容（兼容部分网关）。
  */
 import { memo, useEffect, useState } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Code2, Copy, Download, FileText, Pencil, RefreshCw, Trash2, ZoomIn } from "lucide-react";
-import { MarkdownRenderer } from "@/components/markdown/MarkdownRenderer";
+import dynamic from "next/dynamic";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, FileText, Pencil, RefreshCw, Trash2, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { ChatMessage } from "@/types";
 import { cn } from "@/lib/utils";
 import { BRAND_ICON_PATH, BRAND_NAME } from "@/lib/brand";
+
+const MarkdownRenderer = dynamic(
+  () => import("@/components/markdown/MarkdownRenderer").then((module) => module.MarkdownRenderer),
+  {
+    ssr: false,
+    loading: () => <div className="whitespace-pre-wrap text-sm text-foreground/90">正在渲染回答…</div>,
+  },
+);
 
 type Props = {
   message: ChatMessage;
@@ -308,6 +316,16 @@ function MessageBubbleImpl({
                 />
               ) : null}
             </div>
+            {message.citations?.length ? (
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {message.citations.map((citation) => (
+                  <a key={`${citation.index}-${citation.url}`} href={citation.url} target="_blank" rel="noopener noreferrer" className="group/source rounded-2xl border border-border/60 bg-muted/25 p-3 transition hover:border-primary/35 hover:bg-muted/45">
+                    <div className="flex items-start gap-2"><span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">{citation.index}</span><span className="min-w-0 flex-1 truncate text-xs font-medium">{citation.title}</span><ExternalLink className="size-3.5 shrink-0 text-muted-foreground group-hover/source:text-primary" /></div>
+                    <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-muted-foreground">{citation.snippet || citation.url}</p>
+                  </a>
+                ))}
+              </div>
+            ) : null}
             {message.imageUrls?.length ? (
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {message.imageUrls.map((url, idx) => renderImageCard(url, `a-u-${idx}-${url.slice(0, 24)}`, "max-h-48 w-full cursor-zoom-in object-cover"))}

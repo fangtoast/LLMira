@@ -6,9 +6,10 @@
  * @function
  *   - OpenAI 兼容 HTTP：模型列表、流式对话、文生图
  *   - SSE 行解析与推理 token 抽取
- * @description 浏览器侧直连 `NEXT_PUBLIC_API_BASE_URL`；依赖 `@/lib/logger` 打点与 `@/lib/api/types` 请求体定义。
+ * @description Tauri 使用插件 HTTP 直连，Web 使用标准 fetch；依赖统一 Provider Profile 与日志层。
  */
 import { logger } from "@/lib/logger";
+import { runtimeFetch } from "@/lib/providers/runtime";
 import type { TokenUsage } from "@/types";
 import { extractModelIdsFromResponse } from "./parseModelsResponse";
 import type {
@@ -23,8 +24,10 @@ import { MissingApiKeyError } from "./types";
 const fallbackBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
 
 export type ApiRequestProfile = {
+  id?: string;
   apiKey: string;
   baseUrl: string;
+  executionMode?: "device" | "server";
 };
 
 export function normalizeBaseUrl(baseUrl?: string) {
@@ -68,11 +71,12 @@ function extractReasoningToken(delta: unknown): string | undefined {
   return undefined;
 }
 
-function getHeaders(apiKey: string) {
-  if (!apiKey) throw new MissingApiKeyError();
+function getHeaders(profile: ApiRequestProfile) {
+  if (!profile.apiKey) throw new MissingApiKeyError();
   return {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${apiKey}`,
+    Authorization: `Bearer ${profile.apiKey}`,
+    ...(profile.executionMode === "server" && profile.id ? { "x-llmira-provider-id": profile.id } : {}),
   };
 }
 
@@ -82,8 +86,8 @@ function getHeaders(apiKey: string) {
  * @throws Error 当 HTTP 非成功或 JSON 非法时
  */
 export async function fetchModels(profile: ApiRequestProfile): Promise<string[]> {
-  const res = await fetch(`${normalizeBaseUrl(profile.baseUrl)}/v1/models`, {
-    headers: getHeaders(profile.apiKey),
+  const res = await runtimeFetch(`${normalizeBaseUrl(profile.baseUrl)}/v1/models`, {
+    headers: getHeaders(profile),
   });
   if (!res.ok) {
     const detail = await readErrorText(res);
@@ -202,9 +206,9 @@ export async function streamChatCompletion(
   let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
   try {
-    const response = await fetch(`${normalizeBaseUrl(profile.baseUrl)}/v1/chat/completions`, {
+    const response = await runtimeFetch(`${normalizeBaseUrl(profile.baseUrl)}/v1/chat/completions`, {
       method: "POST",
-      headers: getHeaders(profile.apiKey),
+      headers: getHeaders(profile),
       body: JSON.stringify({ ...payload, stream: true }),
       signal: requestSignal,
     });
@@ -298,9 +302,9 @@ export async function generateImage(
   const startedAt = performance.now();
   const { requestSignal } = createRequestSignalWithTimeout(options?.signal, DEFAULT_SHORT_REQUEST_TIMEOUT_MS);
   logger.info({ model: payload.model }, "[Request Model]");
-  const response = await fetch(`${normalizeBaseUrl(profile.baseUrl)}/v1/images/generations`, {
+  const response = await runtimeFetch(`${normalizeBaseUrl(profile.baseUrl)}/v1/images/generations`, {
     method: "POST",
-    headers: getHeaders(profile.apiKey),
+    headers: getHeaders(profile),
     body: JSON.stringify(payload),
     signal: requestSignal,
   });

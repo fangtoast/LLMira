@@ -12,6 +12,8 @@ export const DropdownMenu = DropdownMenuPrimitive.Root;
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 export const DropdownMenuGroup = DropdownMenuPrimitive.Group;
 export const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
+export const DropdownMenuLabel = DropdownMenuPrimitive.Label;
+export const DropdownMenuSeparator = DropdownMenuPrimitive.Separator;
 
 export function DropdownMenuContent({
   className,

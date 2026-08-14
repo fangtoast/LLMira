@@ -98,19 +98,114 @@ export interface KnowledgeDocument {
   updatedAt: string;
 }
 
+export type ProviderProtocol = "openai_compatible";
+
+export type ExecutionMode = "device" | "server";
+
+export interface ModelSelection {
+  providerId: string;
+  modelId: string;
+}
+
+export interface ModelCapabilities {
+  chat: boolean;
+  vision: boolean;
+  imageGeneration: boolean;
+  reasoning: boolean;
+  tools: boolean;
+  nativeWebSearch: boolean;
+}
+
+export interface ProviderModel {
+  providerId: string;
+  id: string;
+  name: string;
+  capabilities: ModelCapabilities;
+  contextWindow?: number;
+  ownedBy?: string;
+  source: "upstream" | "rule" | "manual";
+}
+
 export interface ProviderProfile {
   id: string;
   workspaceId?: string;
   ownerUserId?: string;
   name: string;
   baseUrl: string;
-  providerType: "openai_compatible";
+  providerType: ProviderProtocol;
+  executionMode: ExecutionMode;
   scope: "team" | "personal";
   modelPreset: string[];
   hasSecret: boolean;
   enabled: boolean;
+  scanStatus: "never" | "scanning" | "ready" | "failed";
+  lastScannedAt?: string;
+  scanError?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface WebCitation {
+  id: string;
+  index: number;
+  title: string;
+  url: string;
+  snippet: string;
+  fetchedAt: string;
+}
+
+export interface SearchProfile {
+  id: string;
+  name: string;
+  provider: "searxng" | "tavily" | "brave";
+  baseUrl?: string;
+  enabled: boolean;
+  hasSecret: boolean;
+}
+
+export interface Conversation {
+  id: string;
+  workspaceId?: string;
+  title: string;
+  defaultModel: ModelSelection;
+  systemPrompt?: string;
+  summary?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  role: "system" | "user" | "assistant" | "tool";
+  content: unknown;
+  status: "queued" | "streaming" | "completed" | "partial" | "failed" | "cancelled";
+  actualModel?: ModelSelection;
+  usage?: Record<string, number>;
+  citations: WebCitation[];
+  error?: string;
+  createdAt: string;
+}
+
+export interface ChatTurn {
+  id: string;
+  conversationId: string;
+  userMessageId: string;
+  assistantMessageId?: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  selection: ModelSelection;
+  generationSettings: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatTurnEvent<TPayload = Record<string, unknown>> {
+  id: string;
+  turnId: string;
+  sequence: number;
+  type: "turn.queued" | "turn.started" | "turn.delta" | "turn.completed" | "turn.failed" | "turn.cancelled";
+  payload: TPayload;
+  createdAt: string;
 }
 
 export interface McpServer {

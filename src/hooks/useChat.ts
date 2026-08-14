@@ -15,6 +15,7 @@ import { DEFAULT_STREAM_TIMEOUT_MS, generateImage, normalizeBaseUrl, streamChatC
 import type { ChatCompletionRequest, ImageGenerationRequest, StreamAbortReason } from "@/lib/api/types";
 import { useChatStore } from "@/lib/store/chatStore";
 import { useSettingsStore, type ModelGenerationSettings } from "@/lib/store/settingsStore";
+import { searchWeb } from "@/lib/search/webSearch";
 import { useConversations } from "./useConversations";
 import type { ApiRequestSnapshot, ChatAttachment, ChatMessage, ChatMessageVariant } from "@/types";
 
@@ -92,6 +93,7 @@ function createRequestSnapshot(
   const baseUrl = normalizeBaseUrl(apiProfile.baseUrl);
   return {
     kind,
+    providerId: apiProfile.id,
     baseUrl,
     endpoint: `${baseUrl}${path}`,
     body,
@@ -215,6 +217,10 @@ export function useChat() {
       chatSettings: ModelGenerationSettings;
       thinkingEnabled: boolean;
       historyMessages?: ChatMessage[];
+      contextWindow?: number;
+      nativeWebSearch?: boolean;
+      evidence?: string;
+      citations?: ChatMessage["citations"];
     }) => {
       const {
         conversationId,
@@ -227,6 +233,10 @@ export function useChat() {
         chatSettings,
         thinkingEnabled,
         historyMessages,
+        contextWindow,
+        nativeWebSearch,
+        evidence,
+        citations,
       } = params;
       let acc = "";
       let thinkingAcc = "";
@@ -235,7 +245,8 @@ export function useChat() {
         (useChatStore.getState().messagesByConversation[conversationId] ?? []).filter(
           (m) => m.id !== userMessage.id && m.id !== assistantId,
         );
-      const apiMessages = buildApiMessagesFromChat(history, content, attachments);
+      const apiMessages = buildApiMessagesFromChat(history, content, attachments, { contextWindow, evidence });
+      if (citations?.length) updateMessage(conversationId, assistantId, { citations });
 
       const ac = new AbortController();
       streamAbortRef.current = ac;
@@ -251,6 +262,7 @@ export function useChat() {
           presence_penalty: chatSettings.presencePenalty,
           frequency_penalty: chatSettings.frequencyPenalty,
           messages: apiMessages,
+          web_search_options: nativeWebSearch ? {} : undefined,
         },
         {
           onToken: (token) => {
@@ -272,6 +284,7 @@ export function useChat() {
                 content: acc,
                 thinkingContent: thinkingAcc || undefined,
                 tokenUsage: usage,
+                status: "completed" as const,
               };
               if (m.variants) {
                 const newVariant: ChatMessageVariant = {
@@ -290,7 +303,7 @@ export function useChat() {
           },
           onAbort: async (reason) => {
             const text = formatAbortedStreamAssistantContent(acc, reason);
-            patchAssistantMessage(conversationId, assistantId, { content: text, thinkingContent: thinkingAcc || undefined });
+            updateMessage(conversationId, assistantId, { content: text, thinkingContent: thinkingAcc || undefined, status: acc ? "partial" : "cancelled" });
             const patched = (useChatStore.getState().messagesByConversation[conversationId] ?? []).map((m) =>
               m.id === assistantId
                 ? { ...m, content: text, thinkingContent: thinkingAcc || undefined }
@@ -306,6 +319,7 @@ export function useChat() {
       patchAssistantMessage,
       saveFinalMessages,
       setLastTokenUsage,
+      updateMessage,
     ],
   );
 
@@ -389,6 +403,8 @@ export function useChat() {
             ...m,
             content: finalText,
             modelName: imageModel,
+            providerId: apiProfile.id,
+            status: "completed",
             generatedImageUrls: images,
             requestSnapshot,
           };
@@ -468,6 +484,9 @@ export function useChat() {
         content: trimmed || (attachments.length ? "[附件]" : ""),
         createdAt: userCreatedAt,
         attachments,
+        providerId: apiProfile.id,
+        modelName: selectedGenerationMode === "image" ? selectedImageModel : selectedChatModel,
+        status: "completed",
         imageUrls: attachments
           .filter((item) => item.kind === "image" && item.status === "ready" && item.dataUrl)
           .map((item) => item.dataUrl!),
@@ -479,6 +498,8 @@ export function useChat() {
         role: "assistant",
         senderName: "Assistant",
         modelName: selectedGenerationMode === "image" ? selectedImageModel : selectedChatModel,
+        providerId: apiProfile.id,
+        status: "running",
         content: "",
         createdAt: assistantCreatedAt,
       };
@@ -499,6 +520,20 @@ export function useChat() {
             apiProfile,
           });
         } else {
+          const selectedModelMetadata = apiProfile.modelCatalog?.find?.((model) => model.id === selectedChatModel);
+          const wantsSearch = settingsSnapshot.webSearchMode === "on" || (settingsSnapshot.webSearchMode === "auto" && /(最新|今天|当前|新闻|联网|搜索|查找|价格|天气|latest|today|news|search)/i.test(trimmed));
+          const nativeWebSearch = wantsSearch && Boolean(selectedModelMetadata?.capabilities.nativeWebSearch);
+          let evidence: string | undefined;
+          let citations: ChatMessage["citations"];
+          if (wantsSearch && !nativeWebSearch) {
+            try {
+              const searched = await searchWeb(trimmed, { provider: settingsSnapshot.searchProvider, baseUrl: settingsSnapshot.searchBaseUrl || undefined, apiKey: settingsSnapshot.searchApiKey || undefined });
+              evidence = searched.evidence;
+              citations = searched.citations;
+            } catch (searchError) {
+              setClientNotice(`联网搜索失败，已继续普通对话：${searchError instanceof Error ? searchError.message : "未知错误"}`);
+            }
+          }
           await runStreamForAssistant({
             conversationId,
             assistantId,
@@ -509,13 +544,17 @@ export function useChat() {
             chatModel: selectedChatModel,
             chatSettings: selectedChatSettings,
             thinkingEnabled: selectedThinkingEnabled,
+            contextWindow: selectedModelMetadata?.contextWindow,
+            nativeWebSearch,
+            evidence,
+            citations,
           });
         }
       } catch (error) {
         if (!isAbortError(error)) {
           const fallback = buildFriendlyError(error);
           setClientNotice(fallback);
-          patchAssistantMessage(conversationId, assistantId, { content: fallback });
+          updateMessage(conversationId, assistantId, { content: fallback, status: "failed" });
           const list = useChatStore.getState().messagesByConversation[conversationId] ?? [];
           const final = list.map((m) => (m.id === assistantId ? { ...m, content: fallback } : m));
           await saveFinalMessages(conversationId, final);
@@ -531,13 +570,13 @@ export function useChat() {
       addMessage,
       createConversation,
       loading,
-      patchAssistantMessage,
       runStreamForAssistant,
       runImageForAssistant,
       saveFinalMessages,
       setApiKeyModalOpen,
       setClientNotice,
       setLoading,
+      updateMessage,
       userAvatarText,
       userName,
     ],

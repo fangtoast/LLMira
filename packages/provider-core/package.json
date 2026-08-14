@@ -1,0 +1,22 @@
+{
+  "name": "@llmira/provider-core",
+  "version": "0.2.0-dev.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@llmira/contracts": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "4.1.0"
+  }
+}

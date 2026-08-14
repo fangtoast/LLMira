@@ -11,16 +11,9 @@
  * @description 字符上限来自 `NEXT_PUBLIC_INPUT_MAX_CHARS`。
  */
 import { useEffect, useRef, useState, type ClipboardEvent, type ClipboardEventHandler } from "react";
-import { ArrowUp, CheckCircle2, FileText, FileUp, Loader2, MessageCircle, Paintbrush, Sparkles, Square, X } from "lucide-react";
+import { ArrowUp, CheckCircle2, FileText, FileUp, Loader2, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ModelMenu } from "@/components/chat/ModelMenu";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useModels } from "@/hooks/useModels";
 import { FILE_INPUT_ACCEPT, inferAttachmentKind } from "@/lib/files/attachmentFormat";
 import { parseAttachment } from "@/lib/files/parseAttachment";
@@ -60,11 +53,6 @@ export function InputBar({
     activeModel,
     activeImageModel,
     generationMode,
-    setGenerationMode,
-    setActiveModel,
-    setActiveImageModel,
-    enableThinking,
-    setEnableThinking,
   } = useSettingsStore();
   const models = useModels();
   const imageModels = models.filter((item) => /(image|mj|dall|flux|sd|gpt-image)/i.test(item));
@@ -291,6 +279,7 @@ export function InputBar({
                   type="button"
                   className="rounded-full bg-black/40 p-0.5 text-white"
                   onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== item.id))}
+                  aria-label={`移除附件 ${item.name}`}
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -298,13 +287,13 @@ export function InputBar({
             ))}
           </div>
         )}
-        <div className="flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center justify-between gap-2 px-1">
           <div className="min-w-0 text-xs text-muted-foreground">
             <span className="rounded-full bg-secondary/70 px-2.5 py-1 ring-1 ring-border/50 dark:bg-white/5">
               即将使用：<span className="font-medium text-foreground">{selectValue || "模型加载中"}</span>
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground sm:justify-end">
+          <div className="flex shrink-0 items-center text-sm text-muted-foreground">
             <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary/70 px-3 text-xs ring-1 ring-border/50 transition hover:bg-accent dark:bg-white/5 dark:hover:bg-white/10">
               <FileUp className="h-3.5 w-3.5" />
               附件
@@ -319,46 +308,6 @@ export function InputBar({
                 }}
               />
             </label>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary/70 px-3 text-xs text-inherit outline-none ring-1 ring-border/50 transition hover:bg-accent dark:bg-white/5 dark:hover:bg-white/10"
-                type="button"
-              >
-                {generationMode === "image" ? <Paintbrush className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}
-                {generationMode === "image" ? "文生图" : "对话"}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" className="w-40 rounded-2xl p-1.5" sideOffset={6}>
-                <DropdownMenuItem className="gap-2 rounded-xl text-xs" onSelect={() => setGenerationMode("chat")}>
-                  <MessageCircle className="h-3.5 w-3.5" />
-                  对话模式{generationMode === "chat" ? " ✓" : ""}
-                </DropdownMenuItem>
-                <DropdownMenuItem className="gap-2 rounded-xl text-xs" onSelect={() => setGenerationMode("image")}>
-                  <Paintbrush className="h-3.5 w-3.5" />
-                  文生图模式{generationMode === "image" ? " ✓" : ""}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <button
-              type="button"
-              className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary/70 px-3 text-xs ring-1 ring-border/50 transition hover:bg-accent dark:bg-white/5 dark:hover:bg-white/10",
-                enableThinking && "bg-primary/12 text-primary ring-primary/20 dark:bg-white/10 dark:text-zinc-50",
-              )}
-              onClick={() => setEnableThinking(!enableThinking)}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              思考{enableThinking ? " 开" : ""}
-            </button>
-            <ModelMenu
-              value={selectValue}
-              models={modelOptions}
-              align="end"
-              triggerClassName="h-8 max-w-[11rem] bg-secondary/70 dark:bg-white/5"
-              onChange={(model) => {
-                if (generationMode === "image") setActiveImageModel(model);
-                else setActiveModel(model);
-              }}
-            />
           </div>
         </div>
         <div
@@ -400,6 +349,7 @@ export function InputBar({
               size="icon"
               disabled={hasReadingAttachments}
               className="h-10 w-10 shrink-0 rounded-full bg-slate-200 text-slate-600 transition-all duration-200 hover:-translate-y-0.5 hover:scale-105 hover:bg-primary hover:text-primary-foreground dark:bg-white dark:text-zinc-950"
+              aria-label={generationMode === "image" ? "生成图像" : "发送消息"}
             >
               <ArrowUp className="h-4 w-4" />
             </Button>

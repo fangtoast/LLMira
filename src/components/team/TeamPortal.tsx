@@ -8,7 +8,7 @@
  * @function
  *   - 连接团队服务器并完成管理员初始化或成员登录
  *   - 在认证后装配跨端知识工作台
- * @description 首发仅支持团队服务器；preview 查询参数只提供无凭据的视觉验收数据。
+ * @description 团队入口独立于个人客户端；仅开发环境显式 `?demo=1` 可展示演示数据。
  */
 import * as React from "react";
 import {
@@ -89,7 +89,8 @@ function FormField({
 
 /** 团队模式入口。 */
 export function TeamPortal() {
-  const preview = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "1";
+  const requestedPreview = process.env.NODE_ENV === "development" && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("demo") === "1";
+  const [preview] = React.useState(requestedPreview);
   const [state, setState] = React.useState<PortalState>("checking");
   const [apiBase, setApiBase] = React.useState(getTeamApiBase);
   const [session, setSession] = React.useState<TeamSession | null>(null);
@@ -198,6 +199,7 @@ export function TeamPortal() {
         session={session}
         api={new TeamApiClient(apiBase, session.accessToken)}
         preview={preview}
+        personalMode={false}
       />
     );
   }
