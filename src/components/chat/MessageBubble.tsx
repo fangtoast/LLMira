@@ -11,13 +11,14 @@
  */
 import { memo, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Code2, Copy, Download, ExternalLink, FileText, Pencil, RefreshCw, Trash2, ZoomIn } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Code2, Copy, Download, ExternalLink, FileText, LoaderCircle, Pencil, Play, RefreshCw, Trash2, X, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { ChatMessage } from "@/types";
 import { cn } from "@/lib/utils";
 import { BRAND_ICON_PATH, BRAND_NAME } from "@/lib/brand";
+import { resolveToolApproval } from "@/lib/mcp/approval";
 
 const MarkdownRenderer = dynamic(
   () => import("@/components/markdown/MarkdownRenderer").then((module) => module.MarkdownRenderer),
@@ -298,7 +299,38 @@ function MessageBubbleImpl({
                 </div>
               </details>
             ) : null}
-            {isStreaming && !message.content && !thinkContent ? (
+            {message.toolCalls?.length ? (
+              <div className="mt-3 grid gap-2">
+                {message.toolCalls.map((call) => (
+                  <section key={call.id} className="rounded-xl border border-border/70 bg-muted/25 p-3" aria-label={`${call.serverName} ${call.toolName} 工具调用`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-md bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary">{call.serverName}</span>
+                      <span className="text-sm font-medium">{call.toolName}</span>
+                      <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                        {call.status === "running" ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
+                        {call.status === "completed" ? <Check className="size-3.5 text-emerald-500" /> : null}
+                        {call.status === "failed" || call.status === "cancelled" ? <CircleAlert className="size-3.5 text-destructive" /> : null}
+                        {call.status === "rejected" ? <X className="size-3.5" /> : null}
+                        {{ pending: "等待批准", running: "正在调用", completed: "已完成", failed: "调用失败", cancelled: "已取消", rejected: "已拒绝" }[call.status]}
+                      </span>
+                    </div>
+                    <details className="mt-2 text-xs text-muted-foreground">
+                      <summary className="cursor-pointer select-none">查看参数</summary>
+                      <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-background/70 p-2 font-mono text-[11px] leading-5">{call.argumentsText || "{}"}</pre>
+                    </details>
+                    {call.approval === "required" && call.status === "pending" ? (
+                      <div className="mt-3 flex gap-2">
+                        <Button size="sm" variant="approval" onClick={() => resolveToolApproval(call.id, true)}><Play className="size-3.5" />批准</Button>
+                        <Button size="sm" variant="outline" onClick={() => resolveToolApproval(call.id, false)}><X className="size-3.5" />拒绝</Button>
+                      </div>
+                    ) : null}
+                    {call.resultSummary ? <pre className="mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border/50 bg-background/60 p-2 text-xs leading-5">{call.resultSummary}</pre> : null}
+                    {call.error ? <p className="mt-3 text-xs leading-5 text-destructive">{call.error}</p> : null}
+                  </section>
+                ))}
+              </div>
+            ) : null}
+            {isStreaming && !message.content && !thinkContent && !message.toolCalls?.length ? (
               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 <span className="inline-flex gap-0.5">
                   <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: "0ms" }} />

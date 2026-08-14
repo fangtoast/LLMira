@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { migrateSettingsState, useSettingsStore } from "./settingsStore";
 
-describe("settings store v4", () => {
+describe("settings store v5", () => {
   beforeEach(() => {
     useSettingsStore.setState({ favoriteModelsByProvider: {}, reasoningModeByProviderModel: {}, translationModelByProviderId: {} });
   });
@@ -26,5 +26,22 @@ describe("settings store v4", () => {
     useSettingsStore.getState().toggleFavoriteModel("p1", "gpt-5");
     expect(useSettingsStore.getState().favoriteModelsByProvider.p1).toEqual([]);
     expect(useSettingsStore.getState().favoriteModelsByProvider.p2).toEqual(["gpt-5"]);
+  });
+  it("迁移 MCP 时剔除敏感值并限制超时范围", () => {
+    const migrated = migrateSettingsState({
+      mcpServers: [{
+        id: "one",
+        name: "One",
+        transport: "stdio",
+        command: "npx",
+        args: ["server"],
+        timeoutSeconds: 999,
+        env: [{ id: "e", name: "TOKEN", value: "secret", sensitive: true }],
+        headers: [{ id: "h", name: "Authorization", value: "secret", sensitive: true }],
+      }],
+    });
+    expect(migrated.mcpServers[0]?.timeoutSeconds).toBe(600);
+    expect(migrated.mcpServers[0]?.env[0]?.value).toBeUndefined();
+    expect(migrated.mcpServers[0]?.headers[0]?.value).toBeUndefined();
   });
 });

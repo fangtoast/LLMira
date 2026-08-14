@@ -14,6 +14,7 @@ import { createJSONStorage, type StateStorage, persist } from "zustand/middlewar
 import type { ExecutionMode, ProviderModel, ProviderProtocol } from "@llmira/contracts";
 import { deleteProviderSecret, readProviderSecret, saveProviderSecret } from "@/lib/providers/runtime";
 import type { ReasoningMode } from "@/lib/models/catalog";
+import type { McpServerConfig } from "@/lib/mcp/types";
 
 const DEFAULT_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
 const DEFAULT_API_PROFILE_ID = "default";
@@ -74,6 +75,8 @@ export type ApiProfile = {
   modelCatalog: ProviderModel[];
 };
 
+export type AccentTheme = "blue" | "cyan" | "violet";
+
 const DEFAULT_MODEL_GENERATION_SETTINGS: ModelGenerationSettings = {
   temperature: 0.7,
   topP: 1,
@@ -110,6 +113,44 @@ function createDefaultApiProfile(apiKey = ""): ApiProfile {
 function createApiProfileId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `profile-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createEntityId(prefix: string) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function sanitizeMcpServerConfig(input: Partial<McpServerConfig>): McpServerConfig {
+  const now = Date.now();
+  const transport = input.transport === "stdio" ? "stdio" : "streamable_http";
+  return {
+    id: input.id?.trim() || createEntityId("mcp"),
+    name: input.name?.trim() || "未命名 MCP",
+    description: input.description?.trim() || "",
+    transport,
+    url: input.url?.trim() || "",
+    command: input.command?.trim() || "",
+    args: Array.isArray(input.args) ? input.args.map(String).map((value) => value.trim()).filter(Boolean) : [],
+    cwd: input.cwd?.trim() || "",
+    env: Array.isArray(input.env)
+      ? input.env.map((entry) => ({ id: entry.id || createEntityId("env"), name: entry.name.trim(), sensitive: true })).filter((entry) => entry.name)
+      : [],
+    headers: Array.isArray(input.headers)
+      ? input.headers.map((entry) => ({
+          id: entry.id || createEntityId("header"),
+          name: entry.name.trim(),
+          value: entry.sensitive ? undefined : entry.value?.trim(),
+          sensitive: Boolean(entry.sensitive),
+        })).filter((entry) => entry.name)
+      : [],
+    authMode: input.authMode === "bearer" || input.authMode === "headers" ? input.authMode : "none",
+    enabled: Boolean(input.enabled),
+    disabledTools: Array.isArray(input.disabledTools) ? [...new Set(input.disabledTools.map(String))] : [],
+    timeoutSeconds: Math.min(600, Math.max(5, Math.round(input.timeoutSeconds ?? 60))),
+    createdAt: input.createdAt ?? now,
+    updatedAt: input.updatedAt ?? now,
+    secretsRequired: Boolean(input.secretsRequired),
+  };
 }
 
 function sanitizeApiProfile(input: Partial<ApiProfile> | undefined, fallbackApiKey = ""): ApiProfile {
@@ -163,6 +204,9 @@ export interface SettingsState {
   searchProvider: "searxng" | "tavily" | "brave";
   searchBaseUrl: string;
   searchApiKey: string;
+  accentTheme: AccentTheme;
+  mcpServers: McpServerConfig[];
+  activeMcpServerId: string;
   favoriteModelsByProvider: Record<string, string[]>;
   reasoningModeByProviderModel: Record<string, Record<string, ReasoningMode>>;
   translationModelByProviderId: Record<string, string>;
@@ -193,6 +237,11 @@ export interface SettingsState {
   setWebSearchMode: (mode: "off" | "auto" | "on") => void;
   setSearchProfile: (patch: Partial<Pick<SettingsState, "searchProvider" | "searchBaseUrl" | "searchApiKey">>) => void;
   saveSearchApiKey: (key: string) => Promise<void>;
+  setAccentTheme: (theme: AccentTheme) => void;
+  addMcpServer: () => string;
+  updateMcpServer: (serverId: string, patch: Partial<Omit<McpServerConfig, "id">>) => void;
+  deleteMcpServer: (serverId: string) => void;
+  setActiveMcpServerId: (serverId: string) => void;
   toggleFavoriteModel: (providerId: string, modelId: string) => void;
   setReasoningMode: (providerId: string, modelId: string, mode: ReasoningMode) => void;
   setTranslationModel: (providerId: string, modelId: string) => void;
@@ -209,7 +258,7 @@ export interface SettingsState {
   setHasCompletedOnboarding: (completed: boolean) => void;
 }
 
-/** 将旧版持久化设置升级为 v4，并清除历史明文密钥。 */
+/** 将旧版持久化设置升级为 v5，并清除历史明文密钥与 MCP 秘密字段。 */
 export function migrateSettingsState(persisted: unknown) {
   const data = (persisted ?? {}) as Partial<SettingsState> & { apiKey?: string; enableThinking?: boolean };
   const hadLegacyPlaintextSecret = Boolean(data.apiKey) || (Array.isArray(data.apiProfiles) && data.apiProfiles.some((profile) => Boolean(profile?.apiKey)));
@@ -234,6 +283,9 @@ export function migrateSettingsState(persisted: unknown) {
     favoriteModelsByProvider: data.favoriteModelsByProvider ?? {},
     reasoningModeByProviderModel,
     translationModelByProviderId: data.translationModelByProviderId ?? {},
+    accentTheme: data.accentTheme === "cyan" || data.accentTheme === "violet" ? data.accentTheme : "blue",
+    mcpServers: Array.isArray(data.mcpServers) ? data.mcpServers.map((server) => sanitizeMcpServerConfig(server)) : [],
+    activeMcpServerId: typeof data.activeMcpServerId === "string" ? data.activeMcpServerId : "",
     hasCompletedOnboarding: hadLegacyPlaintextSecret ? false : data.hasCompletedOnboarding,
   };
 }
@@ -254,6 +306,9 @@ export const useSettingsStore = create<SettingsState>()(
       searchProvider: "searxng",
       searchBaseUrl: "",
       searchApiKey: "",
+      accentTheme: "blue",
+      mcpServers: [],
+      activeMcpServerId: "",
       favoriteModelsByProvider: {},
       reasoningModeByProviderModel: {},
       translationModelByProviderId: {},
@@ -401,6 +456,39 @@ export const useSettingsStore = create<SettingsState>()(
         await saveProviderSecret(`search:${get().searchProvider}`, searchApiKey);
         set({ searchApiKey });
       },
+      setAccentTheme: (accentTheme) => set({ accentTheme }),
+      addMcpServer: () => {
+        const id = createEntityId("mcp");
+        const now = Date.now();
+        const server = sanitizeMcpServerConfig({
+          id,
+          name: "新的 MCP 服务器",
+          transport: "streamable_http",
+          enabled: false,
+          timeoutSeconds: 60,
+          createdAt: now,
+          updatedAt: now,
+        });
+        set((state) => ({ mcpServers: [...state.mcpServers, server], activeMcpServerId: id }));
+        return id;
+      },
+      updateMcpServer: (serverId, patch) =>
+        set((state) => ({
+          mcpServers: state.mcpServers.map((server) =>
+            server.id === serverId
+              ? sanitizeMcpServerConfig({ ...server, ...patch, id: server.id, createdAt: server.createdAt, updatedAt: Date.now() })
+              : server,
+          ),
+        })),
+      deleteMcpServer: (serverId) =>
+        set((state) => {
+          const mcpServers = state.mcpServers.filter((server) => server.id !== serverId);
+          return {
+            mcpServers,
+            activeMcpServerId: state.activeMcpServerId === serverId ? (mcpServers[0]?.id ?? "") : state.activeMcpServerId,
+          };
+        }),
+      setActiveMcpServerId: (activeMcpServerId) => set({ activeMcpServerId }),
       toggleFavoriteModel: (providerId, modelId) =>
         set((state) => {
           const current = state.favoriteModelsByProvider[providerId] ?? [];
@@ -528,7 +616,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "huiyan-settings",
-      version: 4,
+      version: 5,
       storage,
       migrate: (persisted) => migrateSettingsState(persisted),
       partialize: (state) => ({
@@ -544,6 +632,9 @@ export const useSettingsStore = create<SettingsState>()(
         searchProvider: state.searchProvider,
         searchBaseUrl: state.searchBaseUrl,
         searchApiKey: "",
+        accentTheme: state.accentTheme,
+        mcpServers: state.mcpServers.map((server) => sanitizeMcpServerConfig(server)),
+        activeMcpServerId: state.activeMcpServerId,
         favoriteModelsByProvider: state.favoriteModelsByProvider,
         reasoningModeByProviderModel: state.reasoningModeByProviderModel,
         translationModelByProviderId: state.translationModelByProviderId,

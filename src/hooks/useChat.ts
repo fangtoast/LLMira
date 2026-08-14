@@ -14,12 +14,17 @@ import { inferModelCapabilities } from "@llmira/provider-core";
 import { buildApiMessagesFromChat } from "@/lib/chat/buildMessages";
 import { DEFAULT_STREAM_TIMEOUT_MS, generateImage, normalizeBaseUrl, streamChatCompletion, type ApiRequestProfile } from "@/lib/api/client";
 import type { ChatCompletionRequest, ImageGenerationRequest, StreamAbortReason } from "@/lib/api/types";
+import { parseToolArguments } from "@/lib/api/toolCalls";
+import { requestToolApproval } from "@/lib/mcp/approval";
+import { collectMcpChatTools } from "@/lib/mcp/chatTools";
+import { getMcpRuntimeAdapter } from "@/lib/mcp/runtime";
 import { useChatStore } from "@/lib/store/chatStore";
 import { useSettingsStore, type ModelGenerationSettings } from "@/lib/store/settingsStore";
 import { resolveReasoningEffort, type ReasoningMode } from "@/lib/models/catalog";
 import { searchWeb } from "@/lib/search/webSearch";
 import { useConversations } from "./useConversations";
-import type { ApiRequestSnapshot, ChatAttachment, ChatMessage, ChatMessageVariant } from "@/types";
+import type { ApiRequestSnapshot, ChatAttachment, ChatMessage, ChatMessageVariant, TokenUsage } from "@/types";
+import type { McpToolCall } from "@/lib/mcp/types";
 
 function uid() {
   return crypto.randomUUID();
@@ -34,6 +39,9 @@ const FALLBACK_MODEL_SETTINGS: ModelGenerationSettings = {
   presencePenalty: 0,
   frequencyPenalty: 0,
 };
+
+export const MAX_MCP_TOOL_ROUNDS = 4;
+export const MAX_MCP_TOOL_CALLS = 8;
 
 function isAbortError(e: unknown): boolean {
   if (e && typeof e === "object" && "name" in e && (e as { name: string }).name === "AbortError") return true;
@@ -112,6 +120,7 @@ export function useChat() {
   const {
     userName,
     userAvatarText,
+    mcpServers,
     setApiKeyModalOpen,
   } = useSettingsStore();
   const {
@@ -219,6 +228,7 @@ export function useChat() {
       chatSettings: ModelGenerationSettings;
       reasoningMode: ReasoningMode;
       supportsReasoning: boolean;
+      supportsTools: boolean;
       historyMessages?: ChatMessage[];
       contextWindow?: number;
       nativeWebSearch?: boolean;
@@ -236,6 +246,7 @@ export function useChat() {
         chatSettings,
         reasoningMode,
         supportsReasoning,
+        supportsTools,
         historyMessages,
         contextWindow,
         nativeWebSearch,
@@ -244,6 +255,7 @@ export function useChat() {
       } = params;
       let acc = "";
       let thinkingAcc = "";
+      let persistedToolCalls: McpToolCall[] = [];
       const history =
         historyMessages ??
         (useChatStore.getState().messagesByConversation[conversationId] ?? []).filter(
@@ -254,72 +266,220 @@ export function useChat() {
 
       const ac = new AbortController();
       streamAbortRef.current = ac;
+      const enabledServers = mcpServers.filter((server) => server.enabled);
+      const chatTools = enabledServers.length ? await collectMcpChatTools(enabledServers) : [];
+      if (chatTools.length && !supportsTools) {
+        throw new Error("当前模型不支持工具调用，请在默认模型设置中选择支持 Tools 的聊天模型。");
+      }
 
-      await streamChatCompletion(
-        apiProfile,
-        {
-          model: chatModel,
-          reasoning_effort: resolveReasoningEffort(reasoningMode, supportsReasoning),
-          temperature: chatSettings.temperature,
-          top_p: chatSettings.topP,
-          max_tokens: chatSettings.maxTokens,
-          presence_penalty: chatSettings.presencePenalty,
-          frequency_penalty: chatSettings.frequencyPenalty,
-          messages: apiMessages,
-          web_search_options: nativeWebSearch ? {} : undefined,
-        },
-        {
-          onToken: (token) => {
-            acc += token;
-            patchAssistantMessage(conversationId, assistantId, { content: acc });
+      const toolByWireName = new Map(chatTools.map((tool) => [tool.descriptor.wireName, tool]));
+      const runtime = await getMcpRuntimeAdapter();
+      const protocolMessages = [...apiMessages];
+      let lastUsage: TokenUsage | undefined;
+
+      const persistCurrent = () => {
+        updateMessage(conversationId, assistantId, {
+          content: acc,
+          thinkingContent: thinkingAcc || undefined,
+          toolCalls: persistedToolCalls.length ? persistedToolCalls : undefined,
+        });
+      };
+
+      const persistAbort = async (reason: StreamAbortReason) => {
+        const text = formatAbortedStreamAssistantContent(acc, reason);
+        updateMessage(conversationId, assistantId, {
+          content: text,
+          thinkingContent: thinkingAcc || undefined,
+          toolCalls: persistedToolCalls.length ? persistedToolCalls : undefined,
+          status: acc ? "partial" : "cancelled",
+        });
+        await saveFinalMessages(conversationId, useChatStore.getState().messagesByConversation[conversationId] ?? []);
+      };
+
+      const persistComplete = async () => {
+        setLastTokenUsage(lastUsage);
+        const list = useChatStore.getState().messagesByConversation[conversationId] ?? [];
+        const final = list.map((message) => {
+          if (message.id !== assistantId) return message;
+          const base = {
+            ...message,
+            content: acc,
+            thinkingContent: thinkingAcc || undefined,
+            tokenUsage: lastUsage,
+            toolCalls: persistedToolCalls.length ? persistedToolCalls : undefined,
+            status: "completed" as const,
+          };
+          if (!message.variants) return base;
+          const variant: ChatMessageVariant = {
+            content: acc,
+            thinkingContent: thinkingAcc || undefined,
+            modelName: message.modelName,
+            tokenUsage: lastUsage,
+            createdAt: message.createdAt,
+          };
+          const variants = [...message.variants, variant];
+          return { ...base, variants, activeVariantIdx: variants.length - 1 };
+        });
+        await saveFinalMessages(conversationId, final);
+      };
+
+      for (let round = 0; round < MAX_MCP_TOOL_ROUNDS; round += 1) {
+        let roundCalls: import("@/lib/api/types").ChatToolCallWire[] = [];
+        let abortReason: StreamAbortReason | undefined;
+        await streamChatCompletion(
+          apiProfile,
+          {
+            model: chatModel,
+            reasoning_effort: resolveReasoningEffort(reasoningMode, supportsReasoning),
+            temperature: chatSettings.temperature,
+            top_p: chatSettings.topP,
+            max_tokens: chatSettings.maxTokens,
+            presence_penalty: chatSettings.presencePenalty,
+            frequency_penalty: chatSettings.frequencyPenalty,
+            messages: protocolMessages,
+            web_search_options: nativeWebSearch ? {} : undefined,
+            tools: chatTools.length ? chatTools.map((tool) => tool.definition) : undefined,
+            tool_choice: chatTools.length ? "auto" : undefined,
           },
-          onReasoningToken: (token) => {
-            if (!supportsReasoning) return;
-            thinkingAcc += token;
-            patchAssistantMessage(conversationId, assistantId, { thinkingContent: thinkingAcc });
+          {
+            onToken: (token) => {
+              acc += token;
+              patchAssistantMessage(conversationId, assistantId, { content: acc });
+            },
+            onReasoningToken: (token) => {
+              if (!supportsReasoning) return;
+              thinkingAcc += token;
+              patchAssistantMessage(conversationId, assistantId, { thinkingContent: thinkingAcc });
+            },
+            onDone: (usage, toolCalls) => {
+              lastUsage = usage ?? lastUsage;
+              roundCalls = toolCalls ?? [];
+            },
+            onAbort: (reason) => {
+              abortReason = reason;
+            },
           },
-          onDone: async (usage) => {
-            setLastTokenUsage(usage);
-            const list = useChatStore.getState().messagesByConversation[conversationId] ?? [];
-            const final = list.map((m) => {
-              if (m.id !== assistantId) return m;
-              const base = {
-                ...m,
-                content: acc,
-                thinkingContent: thinkingAcc || undefined,
-                tokenUsage: usage,
-                status: "completed" as const,
-              };
-              if (m.variants) {
-                const newVariant: ChatMessageVariant = {
-                  content: acc,
-                  thinkingContent: thinkingAcc || undefined,
-                  modelName: m.modelName,
-                  tokenUsage: usage,
-                  createdAt: m.createdAt,
-                };
-                const variants = [...m.variants, newVariant];
-                return { ...base, variants, activeVariantIdx: variants.length - 1 };
-              }
-              return base;
-            });
-            await saveFinalMessages(conversationId, final);
-          },
-          onAbort: async (reason) => {
-            const text = formatAbortedStreamAssistantContent(acc, reason);
-            updateMessage(conversationId, assistantId, { content: text, thinkingContent: thinkingAcc || undefined, status: acc ? "partial" : "cancelled" });
-            const patched = (useChatStore.getState().messagesByConversation[conversationId] ?? []).map((m) =>
-              m.id === assistantId
-                ? { ...m, content: text, thinkingContent: thinkingAcc || undefined }
-                : m,
+          { signal: ac.signal, streamTimeoutMs: DEFAULT_STREAM_TIMEOUT_MS },
+        );
+
+        if (abortReason) {
+          await persistAbort(abortReason);
+          return;
+        }
+        if (!roundCalls.length) {
+          await persistComplete();
+          return;
+        }
+        if (persistedToolCalls.length + roundCalls.length > MAX_MCP_TOOL_CALLS) {
+          throw new Error(`单次消息最多允许 ${MAX_MCP_TOOL_CALLS} 次工具调用。`);
+        }
+
+        const calls = roundCalls.map((wireCall): McpToolCall => {
+          const tool = toolByWireName.get(wireCall.function.name);
+          if (!tool) {
+            return {
+              id: wireCall.id,
+              wireName: wireCall.function.name,
+              serverId: "unknown",
+              serverName: "未知服务器",
+              toolName: wireCall.function.name,
+              argumentsText: wireCall.function.arguments,
+              approval: "rejected",
+              status: "failed",
+              error: "模型请求了当前目录中不存在或已禁用的工具。",
+              completedAt: Date.now(),
+            };
+          }
+          try {
+            return {
+              id: wireCall.id,
+              wireName: wireCall.function.name,
+              serverId: tool.descriptor.serverId,
+              serverName: tool.descriptor.serverName,
+              toolName: tool.descriptor.name,
+              argumentsText: wireCall.function.arguments,
+              arguments: parseToolArguments(wireCall.function.arguments),
+              approval: "required",
+              status: "pending",
+            };
+          } catch (error) {
+            return {
+              id: wireCall.id,
+              wireName: wireCall.function.name,
+              serverId: tool.descriptor.serverId,
+              serverName: tool.descriptor.serverName,
+              toolName: tool.descriptor.name,
+              argumentsText: wireCall.function.arguments,
+              approval: "rejected",
+              status: "failed",
+              error: error instanceof Error ? error.message : "工具参数不是有效 JSON。",
+              completedAt: Date.now(),
+            };
+          }
+        });
+        persistedToolCalls = [...persistedToolCalls, ...calls];
+        persistCurrent();
+
+        for (const call of calls) {
+          if (call.status === "failed") continue;
+          const approved = await requestToolApproval(call.id, ac.signal);
+          if (ac.signal.aborted) {
+            await persistAbort("user");
+            return;
+          }
+          if (!approved) {
+            call.approval = "rejected";
+            call.status = "rejected";
+            call.resultSummary = "用户拒绝了此工具调用。";
+            call.completedAt = Date.now();
+            persistedToolCalls = persistedToolCalls.map((item) => item.id === call.id ? { ...call } : item);
+            persistCurrent();
+            continue;
+          }
+          call.approval = "approved";
+          call.status = "running";
+          call.startedAt = Date.now();
+          persistedToolCalls = persistedToolCalls.map((item) => item.id === call.id ? { ...call } : item);
+          persistCurrent();
+          const tool = toolByWireName.get(call.wireName)!;
+          try {
+            const result = await runtime.callTool(
+              tool.connection,
+              call.toolName,
+              call.arguments ?? {},
+              { callId: call.id, signal: ac.signal, timeoutMs: tool.connection.config.timeoutSeconds * 1_000 },
             );
-            await saveFinalMessages(conversationId, patched);
-          },
-        },
-        { signal: ac.signal, streamTimeoutMs: DEFAULT_STREAM_TIMEOUT_MS },
-      );
+            call.status = result.isError ? "failed" : "completed";
+            call.resultSummary = result.summary;
+            call.error = result.isError ? result.summary : undefined;
+          } catch (error) {
+            call.status = ac.signal.aborted ? "cancelled" : "failed";
+            call.error = error instanceof Error ? error.message : "工具调用失败。";
+          }
+          call.completedAt = Date.now();
+          persistedToolCalls = persistedToolCalls.map((item) => item.id === call.id ? { ...call } : item);
+          persistCurrent();
+        }
+
+        protocolMessages.push({
+          role: "assistant",
+          content: null,
+          tool_calls: roundCalls,
+        });
+        for (const call of calls) {
+          protocolMessages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            name: call.wireName,
+            content: call.resultSummary ?? call.error ?? "工具未返回结果。",
+          });
+        }
+      }
+
+      throw new Error(`工具续跑已达到 ${MAX_MCP_TOOL_ROUNDS} 轮上限。`);
     },
     [
+      mcpServers,
       patchAssistantMessage,
       saveFinalMessages,
       setLastTokenUsage,
@@ -549,6 +709,7 @@ export function useChat() {
             chatSettings: selectedChatSettings,
             reasoningMode: selectedReasoningMode,
             supportsReasoning: selectedModelMetadata?.capabilities.reasoning ?? inferModelCapabilities(selectedChatModel).reasoning,
+            supportsTools: selectedModelMetadata?.capabilities.tools ?? inferModelCapabilities(selectedChatModel).tools,
             contextWindow: selectedModelMetadata?.contextWindow,
             nativeWebSearch,
             evidence,
@@ -638,6 +799,7 @@ export function useChat() {
         ...targetAssistant,
         content: "",
         thinkingContent: undefined,
+        toolCalls: undefined,
         modelName: useImageGen ? selectedImageModel : selectedChatModel,
         createdAt: Date.now(),
         variants: existingVariants,
@@ -675,6 +837,7 @@ export function useChat() {
             chatSettings: selectedChatSettings,
             reasoningMode: selectedReasoningMode,
             supportsReasoning: selectedModelMetadata?.capabilities.reasoning ?? inferModelCapabilities(selectedChatModel).reasoning,
+            supportsTools: selectedModelMetadata?.capabilities.tools ?? inferModelCapabilities(selectedChatModel).tools,
             historyMessages,
             contextWindow: selectedModelMetadata?.contextWindow,
           });
@@ -769,6 +932,7 @@ export function useChat() {
         senderName: "Assistant",
         modelName: useImageGen ? selectedImageModel : selectedChatModel,
         content: "",
+        toolCalls: undefined,
         createdAt: Date.now(),
       };
       replaceMessages(convId, [...cut, updatedUser, assistantMessage]);
@@ -800,6 +964,7 @@ export function useChat() {
             chatSettings: selectedChatSettings,
             reasoningMode: selectedReasoningMode,
             supportsReasoning: selectedModelMetadata?.capabilities.reasoning ?? inferModelCapabilities(selectedChatModel).reasoning,
+            supportsTools: selectedModelMetadata?.capabilities.tools ?? inferModelCapabilities(selectedChatModel).tools,
             contextWindow: selectedModelMetadata?.contextWindow,
           });
         }

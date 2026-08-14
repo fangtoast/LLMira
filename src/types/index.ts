@@ -79,6 +79,8 @@ export interface ChatMessage {
   imageUrls?: string[];
   generatedImageUrls?: string[];
   citations?: WebCitation[];
+  /** 助手在本轮请求中发起的 MCP 工具调用及其审批、结果与错误。 */
+  toolCalls?: import("@/lib/mcp/types").McpToolCall[];
   /** 最近一次实际发送的请求体快照，便于核对模型与中转站。 */
   requestSnapshot?: ApiRequestSnapshot;
   /** 重新生成时保留的历史版本快照（按生成顺序，0-based）。 */

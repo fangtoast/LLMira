@@ -14,10 +14,46 @@ export type ChatContentPart =
   | { type: "text"; text: string }
   | { type: "image_url"; image_url: { url: string } };
 
+export interface ChatToolCallWire {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+export interface ChatCompletionMessage {
+  role: ChatRole;
+  content: string | ChatContentPart[] | null;
+  tool_calls?: ChatToolCallWire[];
+  tool_call_id?: string;
+  name?: string;
+}
+
+export interface ChatToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description?: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+export interface ChatToolCallDelta {
+  index: number;
+  id?: string;
+  type?: "function";
+  function?: {
+    name?: string;
+    arguments?: string;
+  };
+}
+
 /** POST `/v1/chat/completions` 的请求体（节选扩展字段）。 */
 export interface ChatCompletionRequest {
   model: string;
-  messages: { role: ChatRole; content: string | ChatContentPart[] }[];
+  messages: ChatCompletionMessage[];
   stream?: boolean;
   group?: "auto" | string;
   temperature?: number;
@@ -27,6 +63,8 @@ export interface ChatCompletionRequest {
   frequency_penalty?: number;
   reasoning_effort?: "low" | "medium" | "high";
   web_search_options?: Record<string, unknown>;
+  tools?: ChatToolDefinition[];
+  tool_choice?: "auto" | "none" | "required";
 }
 
 export interface ModelInfo {
@@ -47,7 +85,8 @@ export interface StreamCallbacks {
   onStart?: () => void;
   onToken?: (token: string) => void;
   onReasoningToken?: (token: string) => void;
-  onDone?: (usage?: TokenUsage) => void | Promise<void>;
+  onToolCallDelta?: (delta: ChatToolCallDelta) => void;
+  onDone?: (usage?: TokenUsage, toolCalls?: ChatToolCallWire[]) => void | Promise<void>;
   /** 流被中止：`user` 为用户 signal；`timeout` 为整次流式等待超时；其余为 `unknown`。 */
   onAbort?: (reason: StreamAbortReason) => void | Promise<void>;
 }

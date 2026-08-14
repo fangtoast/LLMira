@@ -20,6 +20,7 @@ import type {
   StreamCallbacks,
   StreamRequestOptions,
 } from "./types";
+import { mergeToolCallDelta } from "./toolCalls";
 import { MissingApiKeyError } from "./types";
 
 const fallbackBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
@@ -225,6 +226,7 @@ export async function streamChatCompletion(
     const decoder = new TextDecoder();
     let buffer = "";
     let usage: TokenUsage | undefined;
+    const toolCalls = new Map<number, import("./types").ChatToolCallWire>();
 
     while (true) {
       if (signal?.aborted) {
@@ -248,7 +250,7 @@ export async function streamChatCompletion(
         if (data === "[DONE]") continue;
         try {
           const json = JSON.parse(data) as {
-            choices?: Array<{ delta?: { content?: string; reasoning_content?: unknown; reasoning?: unknown; thinking?: unknown } }>;
+            choices?: Array<{ delta?: { content?: string; reasoning_content?: unknown; reasoning?: unknown; thinking?: unknown; tool_calls?: import("./types").ChatToolCallDelta[] } }>;
             usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
           };
           const delta = json.choices?.[0]?.delta;
@@ -256,6 +258,10 @@ export async function streamChatCompletion(
           const reasoningToken = extractReasoningToken(delta);
           if (token) callbacks.onToken?.(token);
           if (reasoningToken) callbacks.onReasoningToken?.(reasoningToken);
+          for (const toolDelta of delta?.tool_calls ?? []) {
+            mergeToolCallDelta(toolCalls, toolDelta);
+            callbacks.onToolCallDelta?.(toolDelta);
+          }
           if (json.usage) {
             usage = {
               promptTokens: json.usage.prompt_tokens,
@@ -274,7 +280,7 @@ export async function streamChatCompletion(
       { elapsedMs: Math.round(performance.now() - startedAt), totalTokens: usage?.totalTokens ?? 0 },
       "[Token Count]",
     );
-    await callbacks.onDone?.(usage);
+    await callbacks.onDone?.(usage, [...toolCalls.entries()].sort(([a], [b]) => a - b).map(([, call]) => call));
   } catch (e) {
     if (requestSignal.aborted || signal?.aborted || isAbortError(e)) {
       if (reader) {

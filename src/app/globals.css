@@ -30,6 +30,26 @@
   --radius: 0.875rem;
 }
 
+:root[data-accent="cyan"] {
+  --primary: 188 90% 43%;
+  --ring: 188 90% 43%;
+}
+
+:root[data-accent="violet"] {
+  --primary: 258 90% 66%;
+  --ring: 258 90% 66%;
+}
+
+.dark[data-accent="cyan"] {
+  --primary: 187 86% 55%;
+  --ring: 187 86% 55%;
+}
+
+.dark[data-accent="violet"] {
+  --primary: 258 92% 70%;
+  --ring: 258 92% 70%;
+}
+
 .dark {
   --background: 222 19% 7%;
   --foreground: 215 28% 95%;

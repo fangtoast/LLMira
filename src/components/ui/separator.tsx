@@ -1,13 +1,33 @@
-/**
- * @project LLMira
- * @file src/components/ui/separator.tsx
- * @author fangtoast <fangtoast@foxmail.com>
- * @date 2026-04-30
- * @description Radix Separator 横线分隔。
- */
-import * as SeparatorPrimitive from "@radix-ui/react-separator";
-import { cn } from "@/lib/utils";
+"use client"
 
-export function Separator({ className, ...props }: SeparatorPrimitive.SeparatorProps) {
-  return <SeparatorPrimitive.Root className={cn("h-px w-full bg-border", className)} {...props} />;
-}
+/** @project LLMira @file src/components/ui/separator.tsx @author fangtoast <fangtoast@foxmail.com> @date 2026-08-14 @description shadcn/Radix 分隔线。 */
+
+import * as React from "react"
+import * as SeparatorPrimitive from "@radix-ui/react-separator"
+
+import { cn } from "@/lib/utils"
+
+const Separator = React.forwardRef<
+  React.ElementRef<typeof SeparatorPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root>
+>(
+  (
+    { className, orientation = "horizontal", decorative = true, ...props },
+    ref
+  ) => (
+    <SeparatorPrimitive.Root
+      ref={ref}
+      decorative={decorative}
+      orientation={orientation}
+      className={cn(
+        "shrink-0 bg-border",
+        orientation === "horizontal" ? "h-[1px] w-full" : "h-full w-[1px]",
+        className
+      )}
+      {...props}
+    />
+  )
+)
+Separator.displayName = SeparatorPrimitive.Root.displayName
+
+export { Separator }

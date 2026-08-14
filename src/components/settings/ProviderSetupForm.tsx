@@ -27,7 +27,7 @@ function formatInspectError(error: unknown): string {
   return "连接失败，请检查地址、密钥和网络。";
 }
 
-export function ProviderSetupForm({ compact = false, onComplete }: { compact?: boolean; onComplete?: () => void }) {
+export function ProviderSetupForm({ compact = false, showProfileList = true, onComplete }: { compact?: boolean; showProfileList?: boolean; onComplete?: () => void }) {
   const store = useSettingsStore();
   const active = store.apiProfiles.find((item) => item.id === store.activeApiProfileId) ?? store.apiProfiles[0]!;
   const [name, setName] = useState(active.name);
@@ -89,8 +89,8 @@ export function ProviderSetupForm({ compact = false, onComplete }: { compact?: b
   }
 
   return (
-    <div className={compact ? "space-y-5" : "grid gap-7 lg:grid-cols-[240px_minmax(0,1fr)]"}>
-      {!compact ? <aside className="space-y-2">
+    <div className={compact || !showProfileList ? "grid gap-5" : "grid gap-7 lg:grid-cols-[240px_minmax(0,1fr)]"}>
+      {!compact && showProfileList ? <aside className="grid content-start gap-2">
         <div className="flex items-center justify-between px-2"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Providers</p><Button size="icon" variant="ghost" className="size-8" onClick={addProfile} aria-label="新增 Provider"><Plus className="size-4" /></Button></div>
         {store.apiProfiles.map((profile) => <button key={profile.id} type="button" onClick={() => selectProfile(profile.id)} className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm transition ${profile.id === active.id ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-accent"}`}><span className={`size-2 rounded-full ${profile.scanStatus === "ready" ? "bg-emerald-500" : profile.scanStatus === "failed" ? "bg-destructive" : "bg-muted-foreground/40"}`} /><span className="min-w-0 flex-1 truncate">{profile.name}</span></button>)}
         <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-destructive" disabled={store.apiProfiles.length <= 1} onClick={() => store.deleteApiProfile(active.id)}><Trash2 className="mr-2 size-4" />删除当前 Provider</Button>

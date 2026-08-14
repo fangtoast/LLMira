@@ -8,20 +8,49 @@
  * @description 与侧栏导入导出联动；`version` 用于向后兼容。
  */
 import type { ChatMessage, Conversation } from "@/types";
+import { sanitizeMcpServerConfig, type AccentTheme, type ApiProfile, type ModelGenerationSettings, type SettingsState } from "@/lib/store/settingsStore";
+import type { McpServerConfig } from "@/lib/mcp/types";
 
 const EXPORT_VERSION = 1 as const;
 
 /** 全量多会话备份版本（与单会话 `ExportedChat` 的 version=1 区分）。 */
-export const FULL_BACKUP_VERSION = 2 as const;
+export const FULL_BACKUP_VERSION = 3 as const;
 
-export type ExportedFullBackup = {
-  version: typeof FULL_BACKUP_VERSION;
-  exportedAt: number;
-  chats: Array<{
-    conversation: Conversation & { keyword?: string };
-    messages: ChatMessage[];
-  }>;
+type BackupChats = Array<{
+  conversation: Conversation & { keyword?: string };
+  messages: ChatMessage[];
+}>;
+
+export type PersonalSettingsBackup = {
+  apiProfiles: Array<Omit<ApiProfile, "apiKey">>;
+  activeApiProfileId: string;
+  activeModel: string;
+  activeImageModel: string;
+  webSearchMode: SettingsState["webSearchMode"];
+  searchProvider: SettingsState["searchProvider"];
+  searchBaseUrl: string;
+  favoriteModelsByProvider: Record<string, string[]>;
+  reasoningModeByProviderModel: SettingsState["reasoningModeByProviderModel"];
+  translationModelByProviderId: Record<string, string>;
+  modelSettingsById: Record<string, ModelGenerationSettings>;
+  accentTheme: AccentTheme;
+  mcpServers: McpServerConfig[];
 };
+
+export type ExportedFullBackupV2 = {
+  version: 2;
+  exportedAt: number;
+  chats: BackupChats;
+};
+
+export type ExportedFullBackupV3 = {
+  version: 3;
+  exportedAt: number;
+  chats: BackupChats;
+  settings: PersonalSettingsBackup;
+};
+
+export type ExportedFullBackup = ExportedFullBackupV2 | ExportedFullBackupV3;
 
 /** 单份可导入的会话快照结构。 */
 export type ExportedChat = {
@@ -74,7 +103,8 @@ export function exportConversationPlain(messages: ChatMessage[]): string {
 export function buildFullBackupPayload(
   conversations: Conversation[],
   messagesByConversation: Record<string, ChatMessage[]>,
-): ExportedFullBackup {
+  settings: SettingsState,
+): ExportedFullBackupV3 {
   const chats = conversations.map((conversation) => ({
     conversation,
     messages: messagesByConversation[conversation.id] ?? [],
@@ -83,6 +113,30 @@ export function buildFullBackupPayload(
     version: FULL_BACKUP_VERSION,
     exportedAt: Date.now(),
     chats,
+    settings: buildSettingsBackup(settings),
+  };
+}
+
+/** 生成不含 Provider、搜索和 MCP 秘密值的可移植设置快照。 */
+export function buildSettingsBackup(settings: SettingsState): PersonalSettingsBackup {
+  return {
+    apiProfiles: settings.apiProfiles.map((profile) => {
+      const safeProfile: Partial<ApiProfile> = { ...profile };
+      delete safeProfile.apiKey;
+      return safeProfile as Omit<ApiProfile, "apiKey">;
+    }),
+    activeApiProfileId: settings.activeApiProfileId,
+    activeModel: settings.activeModel,
+    activeImageModel: settings.activeImageModel,
+    webSearchMode: settings.webSearchMode,
+    searchProvider: settings.searchProvider,
+    searchBaseUrl: settings.searchBaseUrl,
+    favoriteModelsByProvider: settings.favoriteModelsByProvider,
+    reasoningModeByProviderModel: settings.reasoningModeByProviderModel,
+    translationModelByProviderId: settings.translationModelByProviderId,
+    modelSettingsById: settings.modelSettingsById,
+    accentTheme: settings.accentTheme,
+    mcpServers: settings.mcpServers.map((server) => sanitizeMcpServerConfig(server)),
   };
 }
 
@@ -99,8 +153,9 @@ export function parseImportedFullBackupJson(text: string): ExportedFullBackup {
   const data = JSON.parse(text) as unknown;
   if (!data || typeof data !== "object") throw new Error("无效的 JSON");
   const o = data as Record<string, unknown>;
-  if (o.version !== FULL_BACKUP_VERSION) throw new Error("不是全量备份文件（version 应为 2）");
+  if (o.version !== 2 && o.version !== FULL_BACKUP_VERSION) throw new Error("不是受支持的全量备份文件（version 应为 2 或 3）");
   if (!Array.isArray(o.chats)) throw new Error("缺少 chats 数组");
+  if (o.version === FULL_BACKUP_VERSION && (!o.settings || typeof o.settings !== "object")) throw new Error("version 3 备份缺少 settings");
   return data as ExportedFullBackup;
 }
 

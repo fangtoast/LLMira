@@ -135,11 +135,11 @@ export function buildApiMessagesFromChat(
   options: { contextWindow?: number; evidence?: string } = {},
 ): ApiMsg[] {
   const context = assembleConversationHistory(history, options.contextWindow);
-  const mapped: ApiMsg[] = context.history.map((item) => {
+  const mapped: ApiMsg[] = context.history.flatMap((item) => {
     const imageUrls = item.role === "user" ? getAttachmentImageUrls(item) : [];
     const assistantSnapshot = getAssistantActiveSnapshot(item);
     const text = item.role === "user" ? withAttachmentText(item.content, item.attachments) : assistantSnapshot.content;
-    return {
+    const ordinary: ApiMsg = {
       role: item.role,
       content: imageUrls.length
         ? [
@@ -151,6 +151,24 @@ export function buildApiMessagesFromChat(
           ]
         : text,
     };
+    if (item.role !== "assistant" || !item.toolCalls?.length) return [ordinary];
+
+    const toolRequest: ApiMsg = {
+      role: "assistant",
+      content: null,
+      tool_calls: item.toolCalls.map((call) => ({
+        id: call.id,
+        type: "function" as const,
+        function: { name: call.wireName, arguments: call.argumentsText },
+      })),
+    };
+    const toolResults: ApiMsg[] = item.toolCalls.map((call) => ({
+      role: "tool",
+      tool_call_id: call.id,
+      name: call.wireName,
+      content: call.resultSummary ?? call.error ?? (call.status === "rejected" ? "用户拒绝了此工具调用。" : "工具未返回结果。"),
+    }));
+    return [...[toolRequest], ...toolResults, ...(ordinary.content ? [ordinary] : [])];
   });
 
   const currentImageUrls = getAttachmentImageUrls({ attachments });

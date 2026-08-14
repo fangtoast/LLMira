@@ -26,4 +26,17 @@ describe("personal conversation context", () => {
     expect(assembled.summary).toContain("滚动摘要");
     expect(assembled.history.some((item) => item.id === "99")).toBe(false);
   });
+
+  it("重放已持久化的工具请求、结果和最终回答", () => {
+    const assistant = message("2", "assistant", "天气晴朗");
+    assistant.toolCalls = [{
+      id: "call-1", wireName: "mcp_weather_abc1234", serverId: "weather", serverName: "天气服务",
+      toolName: "forecast", argumentsText: "{\"city\":\"长沙\"}", arguments: { city: "长沙" },
+      approval: "approved", status: "completed", resultSummary: "晴，25°C",
+    }];
+    const payload = buildApiMessagesFromChat([message("1", "user", "长沙天气"), assistant], "要带伞吗");
+    expect(payload).toContainEqual(expect.objectContaining({ role: "assistant", content: null, tool_calls: expect.any(Array) }));
+    expect(payload).toContainEqual(expect.objectContaining({ role: "tool", tool_call_id: "call-1", content: "晴，25°C" }));
+    expect(payload).toContainEqual({ role: "assistant", content: "天气晴朗" });
+  });
 });

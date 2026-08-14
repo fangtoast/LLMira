@@ -40,7 +40,7 @@ interface ChatState {
     patch: Partial<
       Pick<
         ChatMessage,
-        "content" | "thinkingContent" | "imageUrls" | "generatedImageUrls" | "modelName" | "providerId" | "status" | "citations" | "tokenUsage" | "requestSnapshot" | "variants" | "activeVariantIdx"
+        "content" | "thinkingContent" | "imageUrls" | "generatedImageUrls" | "modelName" | "providerId" | "status" | "citations" | "tokenUsage" | "requestSnapshot" | "variants" | "activeVariantIdx" | "toolCalls"
       >
     >,
   ) => void;

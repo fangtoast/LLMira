@@ -18,6 +18,7 @@ import {
 } from "@/lib/chat/exportImport";
 import type { ConversationRecord } from "@/lib/db/dexie";
 import { useChatStore } from "@/lib/store/chatStore";
+import { useSettingsStore } from "@/lib/store/settingsStore";
 import type { Conversation, ChatMessage } from "@/types";
 
 function uid() {
@@ -118,7 +119,7 @@ export function useConversations() {
     for (const id of Object.keys(byConv)) {
       byConv[id].sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
     }
-    const payload = buildFullBackupPayload(convs, byConv);
+    const payload = buildFullBackupPayload(convs, byConv, useSettingsStore.getState());
     downloadJsonFile(`llmira-full-backup-${Date.now()}.json`, stringifyFullBackup(payload));
   }, []);
 
@@ -147,6 +148,21 @@ export function useConversations() {
           await db.messages.bulkPut(payload);
         }
       });
+      if (data.version === 3) {
+        const current = useSettingsStore.getState();
+        const importedServers = data.settings.mcpServers.map((server) => ({ ...server, enabled: false, secretsRequired: true }));
+        const importedProfiles = data.settings.apiProfiles
+          .filter((profile) => !current.apiProfiles.some((item) => item.id === profile.id))
+          .map((profile) => ({ ...profile, apiKey: "" }));
+        useSettingsStore.setState({
+          apiProfiles: [...current.apiProfiles, ...importedProfiles],
+          mcpServers: [...current.mcpServers, ...importedServers.filter((server) => !current.mcpServers.some((item) => item.id === server.id))],
+          favoriteModelsByProvider: { ...data.settings.favoriteModelsByProvider, ...current.favoriteModelsByProvider },
+          reasoningModeByProviderModel: { ...data.settings.reasoningModeByProviderModel, ...current.reasoningModeByProviderModel },
+          translationModelByProviderId: { ...data.settings.translationModelByProviderId, ...current.translationModelByProviderId },
+          modelSettingsById: { ...data.settings.modelSettingsById, ...current.modelSettingsById },
+        });
+      }
       await loadAll();
       const list = useChatStore.getState().conversations;
       if (prevActive && list.some((c) => c.id === prevActive)) {
@@ -174,6 +190,16 @@ export function useConversations() {
         await db.messages.bulkPut(payload);
       }
     });
+    if (data.version === 3) {
+      useSettingsStore.setState({
+        ...data.settings,
+        apiProfiles: data.settings.apiProfiles.map((profile) => ({ ...profile, apiKey: "" })),
+        mcpServers: data.settings.mcpServers.map((server) => ({ ...server, enabled: false, secretsRequired: true })),
+        activeMcpServerId: data.settings.mcpServers[0]?.id ?? "",
+        apiKey: "",
+        searchApiKey: "",
+      });
+    }
     const { bootstrapSessionFromIndexedDb } = await import("@/lib/chat/bootstrapSession");
     await bootstrapSessionFromIndexedDb();
   }, []);

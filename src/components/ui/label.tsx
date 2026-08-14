@@ -1,12 +1,6 @@
 "use client"
 
-/**
- * @project LLMira
- * @file src/components/ui/label.tsx
- * @author fangtoast <fangtoast@foxmail.com>
- * @date 2026-08-13
- * @description shadcn/Radix 表单标签封装。
- */
+/** @project LLMira @file src/components/ui/label.tsx @author fangtoast <fangtoast@foxmail.com> @date 2026-08-14 @description shadcn/Radix 表单标签。 */
 
 import * as React from "react"
 import * as LabelPrimitive from "@radix-ui/react-label"

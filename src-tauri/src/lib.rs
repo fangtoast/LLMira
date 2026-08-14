@@ -2,9 +2,21 @@
 
 use tauri::Manager;
 
+mod mcp_runtime;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(mcp_runtime::McpRuntimeState::default())
+        .invoke_handler(tauri::generate_handler![
+            mcp_runtime::mcp_connect,
+            mcp_runtime::mcp_disconnect,
+            mcp_runtime::mcp_test_connection,
+            mcp_runtime::mcp_list_tools,
+            mcp_runtime::mcp_call_tool,
+            mcp_runtime::mcp_cancel_call,
+            mcp_runtime::mcp_read_logs,
+        ])
         .plugin(tauri_plugin_http::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
