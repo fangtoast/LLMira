@@ -86,7 +86,7 @@ LLMira 先解决一个人的日常 AI 使用：把自己的 API Host 和 API Key
 | 联网查询 | 原生搜索优先；SearXNG/Tavily/Brave 回退；最多 5 条结果、抓取前 3 条并持久化引用 |
 | 个人 MCP | Windows 支持 Streamable HTTP 与 STDIO，Android/Web 支持远程 HTTP；工具逐次审批、超时与取消均进入聊天工具循环 |
 | 用量与计费 | 从启用后的新调用开始，在本机记录聊天、翻译、生图、搜索与 MCP；提供年度热力图、筛选明细、价格覆盖和 CSV/JSON 导出 |
-| 设备安全 | Tauri HTTP 直连；Key 进入 Stronghold，不写 localStorage；Provider 元数据、会话和草稿使用设备数据库 |
+| 设备安全 | Tauri HTTP 直连；Key 进入系统凭据库（Windows Credential Manager / Android Keystore），不写 localStorage；Web 刷新后需重新输入 Key |
 | Web 网关 | Fastify 提供 Provider 临时检查、目录刷新、聚合模型和 OpenAI-compatible 网关；服务端密钥加密保存 |
 
 ### 正在继续完成
@@ -148,7 +148,7 @@ LLMira/
 ├── packages/provider-core/ # OpenAI-compatible 扫描、能力与错误分类
 ├── packages/security/      # 服务端密钥加密与令牌摘要
 ├── infra/                  # Caddy、Compose 与 PostgreSQL 迁移
-├── src-tauri/              # Windows / Android 外壳、Stronghold 与 SQLite
+├── src-tauri/              # Windows / Android 外壳、系统凭据库、Stronghold 与 SQLite
 └── .github/workflows/      # 质量门禁与完整 Release 构建
 ```
 
@@ -171,7 +171,7 @@ LLMira/
 
 LLMira is a personal-first, cross-platform AI client. Add an OpenAI-compatible API host and key, scan the real `/v1/models` catalog, then chat across GPT, Claude, DeepSeek, and other models returned by that provider. Switching models affects the next turn while preserving the same conversation context.
 
-Windows and Android connect directly from the device and keep secrets in Tauri Stronghold. The Web build uses a self-hosted LLMira gateway. Image generation and read-only web search with citations are available in the personal flow; team collaboration and Agent experiments are optional extensions under “More”.
+Windows and Android connect directly from the device and keep secrets in the OS credential vault (Windows Credential Manager / Android Keystore). Web secrets stay in memory and must be entered again after a refresh. The Web build uses a self-hosted LLMira gateway. Image generation and read-only web search with citations are available in the personal flow; team collaboration and Agent experiments are optional extensions under “More”.
 
 Download `v0.2.0-dev.1` from [GitHub Releases](https://github.com/fangtoast/LLMira/releases), or run the client locally:
 

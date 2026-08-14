@@ -6,7 +6,7 @@
  * @description v6 迁移、用量偏好与 Provider 级收藏隔离测试。
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { migrateSettingsState, useSettingsStore } from "./settingsStore";
+import { migrateSettingsState, normalizeApiBaseUrl, useSettingsStore } from "./settingsStore";
 
 describe("settings store v6", () => {
   beforeEach(() => {
@@ -18,6 +18,11 @@ describe("settings store v6", () => {
     expect(migrated.usageRangePreference).toBe("30d");
     expect(migrated.usageHeatmapView).toBe("daily");
     expect(migrated.cnyPerUsd).toBeUndefined();
+  });
+
+  it("空 API Host 保持为空且不注入第三方端点", () => {
+    expect(normalizeApiBaseUrl("   ")).toBe("");
+    expect(migrateSettingsState({}).apiProfiles[0]?.baseUrl).toBe("");
   });
 
   it("将旧 enableThinking 映射为当前 Provider/模型的 high", () => {

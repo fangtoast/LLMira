@@ -117,3 +117,11 @@ export class MissingApiKeyError extends Error {
     this.name = "MissingApiKeyError";
   }
 }
+
+/** 未提供 Provider API Host 且构建时未配置默认地址。 */
+export class MissingApiBaseUrlError extends Error {
+  constructor() {
+    super("Provider API Host is required. Configure it explicitly before sending a request.");
+    this.name = "MissingApiBaseUrlError";
+  }
+}

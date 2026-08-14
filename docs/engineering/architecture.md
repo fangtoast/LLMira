@@ -35,7 +35,7 @@ Next.js 使用 `output: "export"`。浏览器和 WebView 只加载 `out/`，认�
 | `apps/worker/` | BullMQ、文档解析、安全抓取、嵌入、Agent 调用 |
 | `packages/contracts/` | `AgentRunStatus`、`ToolRisk`、事件、引用、Provider 与角色 |
 | `packages/security/` | AES-256-GCM 信封、令牌摘要与脱敏 |
-| `src-tauri/` | Windows/Android 外壳、Stronghold、SQLite 草稿和 outbox |
+| `src-tauri/` | Windows/Android 外壳、系统凭据库、Stronghold、SQLite 草稿和 outbox |
 | `infra/` | Caddy 与 PostgreSQL 初始化迁移 |
 
 ## 数据隔离
@@ -75,7 +75,7 @@ stateDiagram-v2
 ## 客户端边界
 
 - Web：HttpOnly 安全 Cookie，不把令牌或 Provider Key 写入 localStorage。
-- Tauri：刷新令牌和设备密钥进入 Stronghold。
+- Tauri：Provider、搜索与 MCP 设备密钥进入系统凭据库；团队刷新令牌仍进入 Stronghold。
 - SQLite：只保存近期消息、离线草稿和幂等 outbox，不复制完整知识库。
 - 旧 Dexie：只作为迁移输入；导入验证完成后才允许用户清理本地副本。
 

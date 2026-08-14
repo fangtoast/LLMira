@@ -7,7 +7,7 @@
  * @date 2026-04-30
  * @function
  *   - Provider 元数据、模型、生成参数、侧栏状态等持久化设置
- * @description localStorage 只保存非敏感元数据；设备密钥由 Stronghold 适配器按需注入内存。
+ * @description localStorage 只保存非敏感元数据；设备密钥由系统凭据库适配器按需注入内存。
  */
 import { create } from "zustand";
 import { createJSONStorage, type StateStorage, persist } from "zustand/middleware";
@@ -18,7 +18,7 @@ import type { McpServerConfig } from "@/lib/mcp/types";
 import { pricingOverrideKey } from "@/lib/usage/keys";
 import type { PricingOverride } from "@/lib/usage/types";
 
-const DEFAULT_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
+const DEFAULT_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ?? "";
 const DEFAULT_API_PROFILE_ID = "default";
 
 const memoryStorage: StateStorage = {
@@ -97,13 +97,13 @@ function clampNumber(value: number, min: number, max: number) {
 export function normalizeApiBaseUrl(value: string) {
   const trimmed = value.trim();
   const withoutTrailingSlash = trimmed.replace(/\/+$/g, "");
-  return withoutTrailingSlash.replace(/\/v1$/i, "") || DEFAULT_API_BASE_URL;
+  return withoutTrailingSlash.replace(/\/v1$/i, "");
 }
 
 function createDefaultApiProfile(apiKey = ""): ApiProfile {
   return {
     id: DEFAULT_API_PROFILE_ID,
-    name: "慧言默认",
+    name: "默认 Provider",
     baseUrl: normalizeApiBaseUrl(DEFAULT_API_BASE_URL),
     apiKey,
     modelPreset: process.env.NEXT_PUBLIC_MODEL_PRESET ?? "",

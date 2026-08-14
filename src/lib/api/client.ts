@@ -21,9 +21,7 @@ import type {
   StreamRequestOptions,
 } from "./types";
 import { mergeToolCallDelta } from "./toolCalls";
-import { MissingApiKeyError } from "./types";
-
-const fallbackBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://api.huiyan-ai.cn";
+import { MissingApiBaseUrlError, MissingApiKeyError } from "./types";
 
 export type ApiRequestProfile = {
   id?: string;
@@ -34,8 +32,10 @@ export type ApiRequestProfile = {
 };
 
 export function normalizeBaseUrl(baseUrl?: string) {
-  const raw = (baseUrl || fallbackBaseUrl).trim();
-  return raw.replace(/\/+$/g, "").replace(/\/v1$/i, "") || fallbackBaseUrl;
+  const raw = baseUrl?.trim() || process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "";
+  const normalized = raw.replace(/\/+$/g, "").replace(/\/v1$/i, "");
+  if (!normalized) throw new MissingApiBaseUrlError();
+  return normalized;
 }
 
 async function readErrorText(response: Response, maxLen = 500) {

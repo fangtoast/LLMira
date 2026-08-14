@@ -120,7 +120,7 @@ const SOURCES = [
     title: "Tauri Stronghold 安全手册",
     host: "v2.tauri.app",
     icon: IconShieldCheck,
-    excerpt: "桌面和移动端的刷新令牌及设备密钥应进入 Stronghold。",
+    excerpt: "刷新令牌进入 Stronghold，Provider 与 MCP 密钥进入系统凭据库。",
   },
 ];
 

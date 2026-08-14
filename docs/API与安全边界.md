@@ -31,6 +31,7 @@
 - 密码：Argon2id；生产环境不接受弱 JWT 或主加密密钥。
 - 浏览器：15 分钟访问 Cookie、30 天旋转刷新 Cookie，均为 HttpOnly。
 - Tauri：Bearer 访问令牌；刷新令牌只在 Stronghold 中持久化。
+- 设备 BYOK：Provider、搜索与 MCP 密钥进入系统凭据库；Web 仅保留当前页面内存，刷新后必须重新输入。
 - Provider：AES-256-GCM 信封保存，Worker 仅在调用边界解密。
 - 路由顺序：个人 BYOK → 团队密钥 → 不可用。
 

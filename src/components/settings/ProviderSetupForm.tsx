@@ -6,7 +6,7 @@
  * @author fangtoast <fangtoast@foxmail.com>
  * @date 2026-08-14
  * @function Provider 临时凭据扫描、结果预览与显式保存
- * @description 扫描失败保留输入；只有点击保存才将密钥交给 Stronghold 或会话内存。
+ * @description 扫描失败保留输入；只有点击保存才将密钥交给系统凭据库或会话内存。
  */
 import { useMemo, useState } from "react";
 import { Check, KeyRound, Loader2, Plus, RefreshCw, Server, Trash2 } from "lucide-react";
@@ -99,7 +99,7 @@ export function ProviderSetupForm({ compact = false, showProfileList = true, onC
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2"><Label htmlFor={`provider-name-${active.id}`}>名称</Label><Input id={`provider-name-${active.id}`} value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：OpenAI 中转站" /></div>
           <div className="space-y-2"><Label htmlFor={`provider-host-${active.id}`}>API Host</Label><Input id={`provider-host-${active.id}`} type="url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://api.example.com" /></div>
-          <div className="space-y-2 sm:col-span-2"><div className="flex items-center justify-between"><Label htmlFor={`provider-key-${active.id}`}>API Key</Label><span className="text-xs text-muted-foreground">{isTauriRuntime() ? "保存在 Stronghold" : "Web 仅保留在当前会话"}</span></div><Input id={`provider-key-${active.id}`} type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="sk-..." autoComplete="off" /></div>
+          <div className="space-y-2 sm:col-span-2"><div className="flex items-center justify-between"><Label htmlFor={`provider-key-${active.id}`}>API Key</Label><span className="text-xs text-muted-foreground">{isTauriRuntime() ? "保存在系统凭据库" : "Web 仅保留在当前会话"}</span></div><Input id={`provider-key-${active.id}`} type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="sk-..." autoComplete="off" /></div>
         </div>
         <Button type="button" variant="outline" onClick={() => void scan()} disabled={scanning || !baseUrl.trim() || !apiKey.trim()} className="w-full sm:w-auto">{scanning ? <Loader2 className="mr-2 size-4 animate-spin" /> : result ? <RefreshCw className="mr-2 size-4" /> : <Server className="mr-2 size-4" />}连接并扫描</Button>
         {error ? <Alert variant="destructive"><KeyRound className="size-4" /><AlertTitle>Provider 连接失败</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}

@@ -3,6 +3,7 @@
 use tauri::Manager;
 
 mod mcp_runtime;
+mod secret_store;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,8 +17,12 @@ pub fn run() {
             mcp_runtime::mcp_call_tool,
             mcp_runtime::mcp_cancel_call,
             mcp_runtime::mcp_read_logs,
+            secret_store::read_device_secret,
+            secret_store::save_device_secret,
+            secret_store::delete_device_secret,
         ])
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_keyring_store::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
                 .add_migrations(
@@ -45,9 +50,8 @@ pub fn run() {
                 .app_local_data_dir()
                 .expect("could not resolve app local data path")
                 .join("stronghold-salt.txt");
-            app.handle().plugin(
-                tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build(),
-            )?;
+            app.handle()
+                .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
             Ok(())
         })
         .run(tauri::generate_context!())

@@ -7,7 +7,7 @@
  * @date 2026-04-30
  * @function
  *   - 缺失 Key 时快速补充当前 Provider 密钥
- * @description 密钥写入 Stronghold 或 Web 会话内存，不进入 localStorage。
+ * @description 密钥写入系统凭据库或 Web 会话内存，不进入 localStorage。
  */
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";

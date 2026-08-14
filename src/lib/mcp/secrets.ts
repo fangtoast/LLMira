@@ -3,7 +3,7 @@
  * @file src/lib/mcp/secrets.ts
  * @author fangtoast <fangtoast@foxmail.com>
  * @date 2026-08-14
- * @function MCP 秘密字段的 Stronghold 与 Web 会话内存适配
+ * @function MCP 秘密字段的系统凭据库与 Web 会话内存适配
  * @description 复用设备安全仓库；序列化值永不进入设置持久化、日志或备份。
  */
 import { deleteProviderSecret, readProviderSecret, saveProviderSecret } from "@/lib/providers/runtime";
