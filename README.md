@@ -52,6 +52,13 @@ Release 只有在 Windows `.exe/.msi`、Android `.apk/.aab` 和校验文件全�
   </tr>
 </table>
 
+### 模型选择
+
+<p align="center">
+  <img src="docs/assets/llmira-preview-model-library.png" alt="LLMira 模型选择面板按家族展示可用模型" width="760" />
+  <br /><sub>模型库：按家族浏览 OpenAI、Anthropic 等模型，查看当前模型、推理能力与收藏状态；切换后从下一轮对话开始生效</sub>
+</p>
+
 ### 翻译与文档处理
 
 <p align="center">
