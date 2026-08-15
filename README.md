@@ -35,22 +35,31 @@ Release 只有在 Windows `.exe/.msi`、Android `.apk/.aab` 和校验文件全�
 
 ## 界面预览
 
-以下截图来自本地演示环境，Provider、模型与会话名称均为演示数据，不包含真实密钥。Windows 与 Web 共用主要界面结构，Android 针对窄屏改为底部导航和单列设置。
+先看实际使用，再看配置界面。以下截图来自本地演示环境，Provider、模型、会话与输入内容均为演示数据，不包含真实密钥。Windows 与 Web 共用主要界面结构，Android 针对窄屏改为底部导航和单列设置。
+
+### 连续对话
 
 <table>
   <tr>
     <td width="68%" align="center">
       <img src="docs/assets/llmira-personal-desktop.png" alt="LLMira Windows 个人对话界面" />
-      <br /><sub>Windows / Web：一级入口首先是对话，左侧只保留会话历史，模型和联网状态位于顶部</sub>
+      <br /><sub>Windows / Web：连续对话与跨模型上下文演示；会话历史在左侧，Provider、模型和联网状态位于顶部</sub>
     </td>
     <td width="32%" align="center">
       <img src="docs/assets/llmira-personal-android.png" alt="LLMira Android 个人对话界面" />
-      <br /><sub>Android：对话、图像、知识库、更多四项底部导航</sub>
+      <br /><sub>Android：手机端继续对话，常用能力收进单手可达的底部导航</sub>
     </td>
   </tr>
 </table>
 
-### 模型接入与工具扩展
+### 翻译与文档处理
+
+<p align="center">
+  <img src="docs/assets/llmira-preview-translate-workbench.png" alt="LLMira 长文本翻译工作台正在准备英文到简体中文翻译" width="900" />
+  <br /><sub>长文本翻译：选择目标语言和模型，粘贴文本或导入 PDF、DOCX、TXT、Markdown，再导出译文</sub>
+</p>
+
+### 配置与工具扩展
 
 <table>
   <tr>
