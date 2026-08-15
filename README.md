@@ -35,6 +35,8 @@ Release 只有在 Windows `.exe/.msi`、Android `.apk/.aab` 和校验文件全�
 
 ## 界面预览
 
+以下截图来自本地演示环境，Provider、模型与会话名称均为演示数据，不包含真实密钥。Windows 与 Web 共用主要界面结构，Android 针对窄屏改为底部导航和单列设置。
+
 <table>
   <tr>
     <td width="68%" align="center">
@@ -47,6 +49,26 @@ Release 只有在 Windows `.exe/.msi`、Android `.apk/.aab` 和校验文件全�
     </td>
   </tr>
 </table>
+
+### 模型接入与工具扩展
+
+<table>
+  <tr>
+    <td width="68%" align="center">
+      <img src="docs/assets/llmira-preview-provider-scan.png" alt="LLMira Windows Provider 扫描与模型能力识别" />
+      <br /><sub>Windows / Web：连接 OpenAI-compatible Provider，扫描模型目录并识别对话、推理与生图能力</sub>
+    </td>
+    <td width="32%" align="center">
+      <img src="docs/assets/llmira-preview-android-settings.png" alt="LLMira Android Provider 设置界面" />
+      <br /><sub>Android：同一套 Provider 配置在窄屏下使用单列布局，底部导航始终可达</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/assets/llmira-preview-mcp.png" alt="LLMira Windows MCP 服务器配置界面" width="900" />
+  <br /><sub>MCP：配置远程 HTTP 工具服务、认证、超时与逐次人工批准；秘密值不会进入 localStorage、日志或备份</sub>
+</p>
 
 ## 什么是 LLMira
 
