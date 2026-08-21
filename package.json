@@ -31,6 +31,7 @@
     "test:api": "npm run test --workspace @llmira/api",
     "build:workspaces": "npm run build:packages && npm run build --workspace @llmira/api && npm run build --workspace @llmira/worker",
     "tauri": "tauri",
+    "sync:android-icons": "node scripts/sync-android-icons.mjs",
     "tauri:dev": "tauri dev",
     "tauri:build:windows": "tauri build --bundles nsis,msi",
     "tauri:android:init": "tauri android init",
